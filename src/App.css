@@ -1,0 +1,216 @@
+/* ------------------------------------------
+   GLOBAL
+-------------------------------------------*/
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: #f7f7fb;
+  color: #222;
+}
+
+.stc-app {
+  padding: 24px;
+}
+
+/* ------------------------------------------
+   HEADER
+-------------------------------------------*/
+.stc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.stc-title {
+  margin: 0 0 6px 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.stc-subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.stc-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ------------------------------------------
+   BUTTONS
+-------------------------------------------*/
+.stc-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+}
+
+.stc-btn-primary {
+  background: #6366f1;  /* Purple like your screenshot */
+  color: white;
+}
+
+.stc-btn-primary:hover {
+  background: #4f46e5;
+}
+
+.stc-btn-secondary {
+  background: white;
+  border: 1px solid #d1d5db;
+}
+
+.stc-btn-secondary:hover {
+  background: #f3f4f6;
+}
+
+.stc-btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.stc-btn-danger:hover {
+  background: #dc2626;
+}
+
+.stc-btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #6b7280;
+}
+
+.stc-btn-ghost:hover {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+}
+
+.stc-link {
+  background: none;
+  border: none;
+  color: #6366f1;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+/* ------------------------------------------
+   DASHBOARD GRID
+-------------------------------------------*/
+.stc-section-heading {
+  margin-bottom: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.stc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.stc-empty {
+  margin-top: 40px;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* ------------------------------------------
+   CARD (the tiles)
+-------------------------------------------*/
+.stc-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.stc-card-title {
+  margin: 0 0 12px;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.stc-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* ------------------------------------------
+   EDITOR FORM
+-------------------------------------------*/
+.stc-editor {
+  max-width: 900px;
+}
+
+.stc-form-section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.stc-section-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.stc-divider {
+  height: 1px;
+  border: none;
+  background: #e5e7eb;
+  margin: 10px 0 15px;
+}
+
+.stc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stc-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stc-input,
+.stc-textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  font-size: 0.95rem;
+}
+
+.stc-input:focus,
+.stc-textarea:focus {
+  outline: none;
+  background: white;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 1px #c7d2fe;
+}
+
+.stc-textarea {
+  resize: vertical;
+}
+
+.stc-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
