@@ -6,6 +6,15 @@ Auto-deploy pipeline: `git push` to `main` on the GitHub repo triggers a
 Tekton PipelineRun on GKE that builds the Vite/React app with Kaniko,
 pushes to Artifact Registry, and rolls out a new Cloud Run revision.
 
+## Local workstation paths
+
+| Laptop | Hostname | Project path | Notes |
+|---|---|---|---|
+| Ford laptop | `H2GQGQJ2RD` | `~/Code/structural-tension-chart` | Corporate-managed; VPC SC blocks personal-account GCP API calls when on Ford network/VPN. Use a non-Ford network for `gcloud container clusters create` etc. |
+| Personal Mac | `MGC1GQGQJ2RD` | `~/structural-tension-chart` (verify) | Originally used for setup. No network restrictions. |
+
+Always confirm `gcloud auth list` shows `lubhit@gmail.com` as active before running anything that touches the personal GCP project.
+
 ## Names and IDs
 
 | Thing | Value |
