@@ -25,7 +25,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: 'Segoe UI, sans-serif' }}>
       <nav style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 40px', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-        <span style={{ color: '#003478', fontWeight: 'bold', fontSize: '18px' }}>Ford | <span style={{fontWeight: 'normal'}}>Tension Tool</span></span>
+        <span style={{ color: '#003478', fontWeight: 'bold', fontSize: '18px' }}>Structure Tension Charting App</span>
       </nav>
 
       {view === "dashboard" && (
