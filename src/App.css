@@ -1,216 +1,127 @@
-/* ------------------------------------------
-   GLOBAL
--------------------------------------------*/
-body {
-  margin: 0;
-  font-family: Inter, system-ui, sans-serif;
-  background: #f7f7fb;
-  color: #222;
-}
+Last login: Sun Jul 12 19:09:54 on ttys001
+(base) lubhit@Lubhits-Air ~ % cat src/main.jsx src/App.jsx
+cat: src/main.jsx: No such file or directory
+cat: src/App.jsx: No such file or directory
+(base) lubhit@Lubhits-Air ~ % cd ~/code/structural-tension-chart
+cat src/main.jsx src/App.jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+import { PublicClientApplication } from "@azure/msal-browser";
+import { MsalProvider } from "@azure/msal-react";
+import { msalConfig } from "./authConfig";
 
-.stc-app {
-  padding: 24px;
-}
+const msalInstance = new PublicClientApplication(msalConfig);
 
-/* ------------------------------------------
-   HEADER
--------------------------------------------*/
-.stc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-}
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <MsalProvider instance={msalInstance}>
+      <App />
+    </MsalProvider>
+  </React.StrictMode>
+);
+import React, { useState, useEffect } from 'react';
+import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from "@azure/msal-react";
+import { loginRequest } from "./authConfig";
 
-.stc-title {
-  margin: 0 0 6px 0;
-  font-size: 1.8rem;
-  font-weight: 700;
-}
+const StructuralTensionChart = () => {
+  const [projectName, setProjectName] = useState("My Strategic Goal");
+  const [vision, setVision] = useState("");
+  const [reality, setReality] = useState("");
+  const [steps, setSteps] = useState([{ id: '1', text: "Sample Action Step" }]);
+  const [done, setDone] = useState([]);
 
-.stc-subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
+  useEffect(() => {
+    const saved = localStorage.getItem('tension-tool-save');
+    if (saved) {
+      const p = JSON.parse(saved);
+      setProjectName(p.projectName); setVision(p.vision); setReality(p.reality);
+      setSteps(p.steps); setDone(p.done);
+    }
+  }, []);
 
-.stc-header-actions {
-  display: flex;
-  gap: 10px;
-}
+  const handleSave = () => {
+    localStorage.setItem('tension-tool-save', JSON.stringify({ projectName, vision, reality, steps, done }));
+    alert("Project saved locally!");
+  };
 
-/* ------------------------------------------
-   BUTTONS
--------------------------------------------*/
-.stc-btn {
-  padding: 8px 18px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-}
+  const onDragStart = (e, step, index) => {
+    e.dataTransfer.setData("step", JSON.stringify(step));
+    e.dataTransfer.setData("index", index);
+  };
 
-.stc-btn-primary {
-  background: #6366f1;  /* Purple like your screenshot */
-  color: white;
-}
+  const onDrop = (e) => {
+    e.preventDefault();
+    const step = JSON.parse(e.dataTransfer.getData("step"));
+    const index = parseInt(e.dataTransfer.getData("index"));
+    setSteps(steps.filter((_, i) => i !== index));
+    setDone([...done, { ...step, date: new Date().toLocaleDateString() }]);
+  };
 
-.stc-btn-primary:hover {
-  background: #4f46e5;
-}
+  return (
+    <div style={{ padding: '40px', maxWidth: '850px', margin: '0 auto' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
+        <input value={projectName} onChange={e => setProjectName(e.target.value)} style={{ fontSize: '26px', fontWeight: 'bold', border: 'none', color: '#003478', outline: 'none', width: '70%' }} />
+        <button onClick={handleSave} style={{ backgroundColor: '#28a745', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Save Changes</button>
+      </header>
 
-.stc-btn-secondary {
-  background: white;
-  border: 1px solid #d1d5db;
-}
+      {/* VISION SECTION */}
+      <div style={{ border: '2px solid #28a745', padding: '25px', borderRadius: '12px', backgroundColor: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#888', letterSpacing: '1px' }}>DESIRED FUTURE (VISION)</label>
+        <textarea value={vision} onChange={e => setVision(e.target.value)} placeholder="What is the end goal?" style={{ width: '100%', border: 'none', fontSize: '18px', marginTop: '10px', outline: 'none', resize: 'none' }} />
+      </div>
 
-.stc-btn-secondary:hover {
-  background: #f3f4f6;
-}
+      {/* TENSION LINE & STEPS */}
+      <div style={{ padding: '50px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', borderLeft: '2px dashed #ccc', zIndex: 0 }}></div>
+        <div style={{ zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+          <div style={{ backgroundColor: '#003478', color: 'white', padding: '5px 15px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>STRUCTURAL TENSION</div>
+          {steps.map((s, i) => (
+            <div key={s.id} draggable onDragStart={e => onDragStart(e, s, i)} style={{ backgroundColor: 'white', border: '1px solid #ddd', padding: '15px', width: '80%', borderRadius: '8px', cursor: 'grab', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+              <input value={s.text} onChange={e => { const n = [...steps]; n[i].text = e.target.value; setSteps(n); }} style={{ border: 'none', width: '100%', outline: 'none' }} placeholder="Action step..." />
+            </div>
+          ))}
+          <button onClick={() => setSteps([...steps, { id: Date.now().toString(), text: "" }])} style={{ border: '1px dashed #003478', background: 'none', color: '#003478', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer' }}>+ Add Action Step</button>
+        </div>
+      </div>
 
-.stc-btn-danger {
-  background: #ef4444;
-  color: white;
-}
+      {/* REALITY SECTION */}
+      <div onDragOver={e => e.preventDefault()} onDrop={onDrop} style={{ border: '2px solid #dc3545', padding: '25px', borderRadius: '12px', backgroundColor: 'white', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#888', letterSpacing: '1px' }}>CURRENT REALITY</label>
+        <textarea value={reality} onChange={e => setReality(e.target.value)} placeholder="Where are you now?" style={{ width: '100%', border: 'none', fontSize: '18px', marginTop: '10px', outline: 'none', resize: 'none' }} />
+        <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+          {done.map(s => <div key={s.id} style={{ color: '#888', textDecoration: 'line-through', fontSize: '14px', marginBottom: '5px' }}>✓ {s.text || "Empty Step"}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+};
 
-.stc-btn-danger:hover {
-  background: #dc2626;
-}
+export default function App() {
+  const { instance } = useMsal();
+  const login = () => instance.loginPopup(loginRequest).catch(e => console.error(e));
+  const logout = () => instance.logoutPopup().catch(e => console.error(e));
 
-.stc-btn-ghost {
-  background: transparent;
-  border: 1px solid transparent;
-  color: #6b7280;
-}
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: 'Segoe UI, sans-serif' }}>
+      <AuthenticatedTemplate>
+        <nav style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 40px', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+          <span style={{ color: '#003478', fontWeight: 'bold', fontSize: '18px' }}>Ford | <span style={{fontWeight: 'normal'}}>Tension Tool</span></span>
+          <button onClick={logout} style={{ background: 'none', border: '1px solid #ccc', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer' }}>Sign Out</button>
+        </nav>
+        <StructuralTensionChart />
+      </AuthenticatedTemplate>
 
-.stc-btn-ghost:hover {
-  border-color: #d1d5db;
-  background: #f3f4f6;
+      <UnauthenticatedTemplate>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'linear-gradient(135deg, #003478 0%, #001a3d 100%)' }}>
+          <div style={{ backgroundColor: 'white', padding: '50px', borderRadius: '12px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', maxWidth: '400px' }}>
+            <h1 style={{ color: '#003478', marginBottom: '10px' }}>Structural Tension</h1>
+            <p style={{ color: '#666', marginBottom: '30px' }}>Sign in with your Personal Microsoft Account to continue.</p>
+            <button onClick={login} style={{ backgroundColor: '#003478', color: 'white', padding: '12px 24px', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>Login with Microsoft</button>
+          </div>
+        </div>
+      </UnauthenticatedTemplate>
+    </div>
+  );
 }
-
-.stc-link {
-  background: none;
-  border: none;
-  color: #6366f1;
-  cursor: pointer;
-  padding: 0;
-  font-size: 0.9rem;
-}
-
-/* ------------------------------------------
-   DASHBOARD GRID
--------------------------------------------*/
-.stc-section-heading {
-  margin-bottom: 10px;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-
-.stc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
-}
-
-.stc-empty {
-  margin-top: 40px;
-  text-align: center;
-  color: #6b7280;
-}
-
-/* ------------------------------------------
-   CARD (the tiles)
--------------------------------------------*/
-.stc-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  padding: 20px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.stc-card-title {
-  margin: 0 0 12px;
-  font-weight: 600;
-  font-size: 1.1rem;
-}
-
-.stc-card-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-/* ------------------------------------------
-   EDITOR FORM
--------------------------------------------*/
-.stc-editor {
-  max-width: 900px;
-}
-
-.stc-form-section {
-  background: white;
-  border: 1px solid #e5e7eb;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.stc-section-title {
-  margin: 0 0 8px;
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.stc-divider {
-  height: 1px;
-  border: none;
-  background: #e5e7eb;
-  margin: 10px 0 15px;
-}
-
-.stc-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stc-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.stc-input,
-.stc-textarea {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background: #f9fafb;
-  font-size: 0.95rem;
-}
-
-.stc-input:focus,
-.stc-textarea:focus {
-  outline: none;
-  background: white;
-  border-color: #6366f1;
-  box-shadow: 0 0 0 1px #c7d2fe;
-}
-
-.stc-textarea {
-  resize: vertical;
-}
-
-.stc-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
+(base) lubhit@Lubhits-Air structural-tension-chart % 
