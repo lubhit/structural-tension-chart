@@ -1,6 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { getChart, createChart, updateChart } from '../api';
 
+const escapeICSText = (str) =>
+  String(str).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+const buildStepICS = (title, description, dueDate) => {
+  const dt = dueDate.replace(/-/g, ''); // YYYY-MM-DD -> YYYYMMDD (all-day event)
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@structuretensionchart`;
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Structure Tension Charting App//EN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;VALUE=DATE:${dt}`,
+    `SUMMARY:${escapeICSText(title)}`,
+    description ? `DESCRIPTION:${escapeICSText(description)}` : '',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n');
+};
+
 const StructuralTensionChart = ({ chartId: initialChartId, onBack }) => {
   const [chartId, setChartId] = useState(initialChartId || null);
   const [vision, setVision] = useState("");
@@ -104,6 +126,15 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack }) => {
     setActionSteps([...actionSteps, newStep]);
   };
 
+  const addStepToCalendar = (step) => {
+    if (!step.dueDate || !step.text) return;
+    const ics = buildStepICS(step.text, `Action step for goal: ${vision}`, step.dueDate);
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
   return (
     <div style={{ padding: '20px', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -184,6 +215,14 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack }) => {
                   }}
                   style={dateInputStyle}
                 />
+                <button
+                  onClick={() => addStepToCalendar(step)}
+                  disabled={!step.dueDate || !step.text}
+                  title={step.dueDate ? "Add to Calendar" : "Set a due date first"}
+                  style={{ ...calendarBtnStyle, opacity: (!step.dueDate || !step.text) ? 0.4 : 1, cursor: (!step.dueDate || !step.text) ? 'not-allowed' : 'pointer' }}
+                >
+                  📅
+                </button>
               </div>
             ))}
 
@@ -332,5 +371,6 @@ const backBtnStyle = {
 const labelStyle = { display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '8px', color: '#555', letterSpacing: '0.5px' };
 const inputStyle = { width: '100%', border: 'none', fontSize: '16px', outline: 'none', resize: 'none', fontFamily: 'inherit', backgroundColor: 'transparent' };
 const dateInputStyle = { border: '1px solid #ccc', borderRadius: '4px', padding: '4px 6px', fontSize: '12px', fontFamily: 'inherit', color: '#555', flexShrink: 0 };
+const calendarBtnStyle = { border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px', fontSize: '14px', backgroundColor: 'transparent', cursor: 'pointer', flexShrink: 0, marginLeft: '6px' };
 
 export default StructuralTensionChart;
