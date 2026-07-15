@@ -34,6 +34,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
   const [completedSteps, setCompletedSteps] = useState([]);
   const [manuallyCompleted, setManuallyCompleted] = useState(false);
   const [status, setStatus] = useState(""); // "loading" | "saving" | "saved" | "error" | ""
+  const [showDropSavePopup, setShowDropSavePopup] = useState(false);
 
   // --- LOAD ON MOUNT (only if editing an existing chart) ---
   useEffect(() => {
@@ -66,11 +67,15 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
   }, [initialChartId]);
 
   // --- SAVE ---
-  const handleSave = async () => {
+  // Accepts optional overrides so callers (like the drag-and-drop handler) can save
+  // freshly computed step arrays without waiting on React's async state updates.
+  const handleSave = async (overrideActionSteps, overrideCompletedSteps) => {
+    const stepsForActive = overrideActionSteps ?? actionSteps;
+    const stepsForCompleted = overrideCompletedSteps ?? completedSteps;
     setStatus("saving");
     const computedStatus = manuallyCompleted
       ? 'completed'
-      : (actionSteps.length > 0 ? 'active' : 'idea');
+      : (stepsForActive.length > 0 ? 'active' : 'idea');
     const payload = {
       goal: vision,
       goalDate: new Date(),
@@ -80,8 +85,8 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
       status: computedStatus,
       ownerId,
       steps: [
-        ...actionSteps.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
-        ...completedSteps.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
+        ...stepsForActive.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
+        ...stepsForCompleted.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
       ],
     };
 
@@ -116,8 +121,16 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
     const step = JSON.parse(stepData);
     const index = parseInt(indexData);
 
-    setActionSteps(actionSteps.filter((_, i) => i !== index));
-    setCompletedSteps([...completedSteps, step]);
+    const newActionSteps = actionSteps.filter((_, i) => i !== index);
+    const newCompletedSteps = [...completedSteps, step];
+
+    setActionSteps(newActionSteps);
+    setCompletedSteps(newCompletedSteps);
+
+    setShowDropSavePopup(true);
+    handleSave(newActionSteps, newCompletedSteps).then(() => {
+      setTimeout(() => setShowDropSavePopup(false), 2000);
+    });
   };
 
   const allowDrop = (e) => e.preventDefault();
@@ -243,6 +256,13 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
           }}
         >
           <label style={labelStyle}>CURRENT REALITY (COMPLETED ITEMS)</label>
+          {showDropSavePopup && (
+            <div style={dropSavePopupStyle}>
+              {status === "saving" && "Saving..."}
+              {status === "saved" && "Saved ✓"}
+              {status === "error" && "Error saving — try the Save button above"}
+            </div>
+          )}
           <textarea
             value={realityText}
             onChange={(e) => setRealityText(e.target.value)}
@@ -317,6 +337,18 @@ const draggableStepStyle = {
   display: 'flex',
   alignItems: 'center',
   boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+};
+
+const dropSavePopupStyle = {
+  backgroundColor: '#e8f5e9',
+  border: '1px solid #28a745',
+  color: '#1b5e20',
+  borderRadius: '6px',
+  padding: '8px 12px',
+  fontSize: '13px',
+  fontWeight: 'bold',
+  marginBottom: '10px',
+  textAlign: 'center',
 };
 
 const completedStepStyle = {

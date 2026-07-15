@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listCharts, deleteChart } from '../api';
+import { listCharts, deleteChart, getChart, updateChart } from '../api';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -68,6 +68,31 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
+  const handleCompleteStep = async (e, item) => {
+    e.stopPropagation();
+    try {
+      const chart = await getChart(item.chartId);
+      if (!chart) return;
+      const updatedSteps = (chart.steps || []).map(s =>
+        s.id === item.stepId ? { ...s, completed: true } : s
+      );
+      await updateChart(item.chartId, {
+        goal: chart.goal,
+        goalDate: chart.goalDate,
+        goalDueDate: chart.goalDueDate,
+        currentReality: chart.currentReality,
+        currentRealityDate: chart.currentRealityDate,
+        status: chart.status,
+        ownerId: chart.ownerId,
+        steps: updatedSteps,
+      });
+      load();
+    } catch (err) {
+      console.error("Failed to complete step:", err);
+      alert("Failed to mark step complete.");
+    }
+  };
+
   return (
     <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
@@ -85,8 +110,16 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
                 onClick={() => onOpenChart(item.chartId)}
                 style={todayItemStyle}
               >
-                <span style={{ fontWeight: 'bold' }}>{item.stepText || "(Untitled step)"}</span>
-                <span style={{ color: '#999', fontSize: '12px' }}> — {item.chartGoal ? item.chartGoal.slice(0, 60) : "(Untitled goal)"}</span>
+                <div>
+                  <span style={{ fontWeight: 'bold' }}>{item.stepText || "(Untitled step)"}</span>
+                  <span style={{ color: '#999', fontSize: '12px' }}> — {item.chartGoal ? item.chartGoal.slice(0, 60) : "(Untitled goal)"}</span>
+                </div>
+                <button
+                  onClick={(e) => handleCompleteStep(e, item)}
+                  style={completeBtnStyle}
+                >
+                  ✓ Complete
+                </button>
               </div>
             ))}
           </div>
@@ -189,12 +222,28 @@ const todaySectionStyle = {
 };
 
 const todayItemStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '12px',
   backgroundColor: 'white',
   border: '1px solid #eee',
   borderRadius: '6px',
   padding: '10px 14px',
   cursor: 'pointer',
   fontSize: '14px',
+};
+
+const completeBtnStyle = {
+  padding: '6px 12px',
+  backgroundColor: 'transparent',
+  border: '1px solid #28a745',
+  color: '#28a745',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '12px',
+  fontWeight: 'bold',
+  flexShrink: 0,
 };
 
 const emptyStateStyle = {
