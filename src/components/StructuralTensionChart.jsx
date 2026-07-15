@@ -28,6 +28,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
   const [vision, setVision] = useState("");
   const [goalDueDate, setGoalDueDate] = useState("");
   const [realityText, setRealityText] = useState("");
+  const [notes, setNotes] = useState("");
   const [actionSteps, setActionSteps] = useState([
     { id: '1', text: "", dueDate: "" }
   ]);
@@ -48,6 +49,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
           setVision(chart.goal || "");
           setGoalDueDate(chart.goalDueDate ? chart.goalDueDate.slice(0, 10) : "");
           setRealityText(chart.currentReality || "");
+          setNotes(chart.notes || "");
           const steps = chart.steps || [];
           setActionSteps(
             steps.filter(s => !s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }))
@@ -70,27 +72,28 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
   // Accepts optional overrides so callers (like the drag-and-drop handler) can save
   // freshly computed step arrays without waiting on React's async state updates.
   const handleSave = async (overrideActionSteps, overrideCompletedSteps) => {
-    const stepsForActive = overrideActionSteps ?? actionSteps;
-    const stepsForCompleted = overrideCompletedSteps ?? completedSteps;
     setStatus("saving");
-    const computedStatus = manuallyCompleted
-      ? 'completed'
-      : (stepsForActive.length > 0 ? 'active' : 'idea');
-    const payload = {
-      goal: vision,
-      goalDate: new Date(),
-      goalDueDate: goalDueDate ? new Date(goalDueDate) : null,
-      currentReality: realityText,
-      currentRealityDate: new Date(),
-      status: computedStatus,
-      ownerId,
-      steps: [
-        ...stepsForActive.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
-        ...stepsForCompleted.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
-      ],
-    };
-
     try {
+      const stepsForActive = overrideActionSteps ?? actionSteps;
+      const stepsForCompleted = overrideCompletedSteps ?? completedSteps;
+      const computedStatus = manuallyCompleted
+        ? 'completed'
+        : (stepsForActive.length > 0 ? 'active' : 'idea');
+      const payload = {
+        goal: vision,
+        goalDate: new Date(),
+        goalDueDate: goalDueDate ? new Date(goalDueDate) : null,
+        currentReality: realityText,
+        notes,
+        currentRealityDate: new Date(),
+        status: computedStatus,
+        ownerId,
+        steps: [
+          ...stepsForActive.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
+          ...stepsForCompleted.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
+        ],
+      };
+
       if (chartId) {
         await updateChart(chartId, payload);
       } else {
@@ -165,7 +168,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
             />
             Mark Completed
           </label>
-          <button onClick={handleSave} disabled={status === "saving"} style={saveBtnStyle}>
+          <button onClick={() => handleSave()} disabled={status === "saving"} style={saveBtnStyle}>
             {status === "saving" ? "Saving..." : "Save"}
           </button>
         </div>
@@ -282,6 +285,16 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
               </div>
             )}
           </div>
+        </div>
+
+        <div style={{ ...boxStyle('#6c757d'), marginTop: '24px' }}>
+          <label style={labelStyle}>NOTES</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            style={{ ...inputStyle, minHeight: '140px', lineHeight: 1.5 }}
+            placeholder="Keep notes, context, links, and follow-ups for this topic here..."
+          />
         </div>
 
       </div>
