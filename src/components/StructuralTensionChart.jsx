@@ -23,7 +23,7 @@ const buildStepICS = (title, description, dueDate) => {
   ].filter(Boolean).join('\r\n');
 };
 
-const StructuralTensionChart = ({ chartId: initialChartId, onBack }) => {
+const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) => {
   const [chartId, setChartId] = useState(initialChartId || null);
   const [vision, setVision] = useState("");
   const [goalDueDate, setGoalDueDate] = useState("");
@@ -78,6 +78,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack }) => {
       currentReality: realityText,
       currentRealityDate: new Date(),
       status: computedStatus,
+      ownerId,
       steps: [
         ...actionSteps.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
         ...completedSteps.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),

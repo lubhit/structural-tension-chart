@@ -1,7 +1,8 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
-export async function listCharts() {
-  const res = await fetch(`${API_URL}/charts`);
+export async function listCharts(ownerId) {
+  const url = ownerId ? `${API_URL}/charts?ownerId=${encodeURIComponent(ownerId)}` : `${API_URL}/charts`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to list charts");
   return res.json();
 }

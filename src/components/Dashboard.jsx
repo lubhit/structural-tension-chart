@@ -19,14 +19,31 @@ const TILE_COLORS = {
   completed: '#4e342e',  // dark brown
 };
 
-const Dashboard = ({ onOpenChart, onNewChart }) => {
+const getTodayStr = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+const getTodayActionItems = (charts, todayStr) => {
+  const items = [];
+  for (const chart of charts) {
+    for (const step of chart.steps || []) {
+      if (!step.completed && step.dueDate && step.dueDate.slice(0, 10) === todayStr) {
+        items.push({ chartId: chart._id, chartGoal: chart.goal, stepId: step.id, stepText: step.text });
+      }
+    }
+  }
+  return items;
+};
+
+const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [charts, setCharts] = useState([]);
   const [status, setStatus] = useState("loading"); // "loading" | "" | "error"
 
   const load = async () => {
     setStatus("loading");
     try {
-      const data = await listCharts();
+      const data = await listCharts(ownerId);
       setCharts(data);
       setStatus("");
     } catch (err) {
@@ -35,7 +52,9 @@ const Dashboard = ({ onOpenChart, onNewChart }) => {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [ownerId]);
+
+  const todayItems = getTodayActionItems(charts, getTodayStr());
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -55,6 +74,24 @@ const Dashboard = ({ onOpenChart, onNewChart }) => {
         <h2 style={{ color: '#003478', margin: 0 }}>My Charts</h2>
         <button onClick={onNewChart} style={newBtnStyle}>+ New Chart</button>
       </div>
+
+      {status === "" && todayItems.length > 0 && (
+        <div style={todaySectionStyle}>
+          <h3 style={{ margin: '0 0 12px', color: '#003478', fontSize: '15px' }}>Today's Action Items</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {todayItems.map((item) => (
+              <div
+                key={`${item.chartId}-${item.stepId}`}
+                onClick={() => onOpenChart(item.chartId)}
+                style={todayItemStyle}
+              >
+                <span style={{ fontWeight: 'bold' }}>{item.stepText || "(Untitled step)"}</span>
+                <span style={{ color: '#999', fontSize: '12px' }}> — {item.chartGoal ? item.chartGoal.slice(0, 60) : "(Untitled goal)"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {status === "loading" && <p style={{ color: '#999' }}>Loading charts...</p>}
       {status === "error" && <p style={{ color: '#dc3545' }}>Failed to load charts. Is stc-api running?</p>}
@@ -141,6 +178,23 @@ const deleteBtnStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '11px',
+};
+
+const todaySectionStyle = {
+  backgroundColor: '#fff8e1',
+  border: '1px solid #f4d35e',
+  borderRadius: '8px',
+  padding: '16px 20px',
+  marginBottom: '30px',
+};
+
+const todayItemStyle = {
+  backgroundColor: 'white',
+  border: '1px solid #eee',
+  borderRadius: '6px',
+  padding: '10px 14px',
+  cursor: 'pointer',
+  fontSize: '14px',
 };
 
 const emptyStateStyle = {
