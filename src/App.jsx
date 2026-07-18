@@ -20,6 +20,7 @@ export default function App() {
   // view: "dashboard" | "chart"
   const [view, setView] = useState("dashboard");
   const [activeChartId, setActiveChartId] = useState(null);
+  const [activeChartType, setActiveChartType] = useState('work');
 
   const handleLogin = useCallback((loggedInUser) => {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(loggedInUser));
@@ -33,13 +34,15 @@ export default function App() {
     setActiveChartId(null);
   };
 
-  const openChart = (id) => {
+  const openChart = ({ id, chartType }) => {
     setActiveChartId(id);
+    setActiveChartType(chartType || 'work');
     setView("chart");
   };
 
-  const newChart = () => {
+  const newChart = (chartType = 'work') => {
     setActiveChartId(null); // null = unsaved new chart
+    setActiveChartType(chartType);
     setView("chart");
   };
 
@@ -73,7 +76,12 @@ export default function App() {
         <Dashboard onOpenChart={openChart} onNewChart={newChart} ownerId={user?.sub} />
       )}
       {view === "chart" && (
-        <StructuralTensionChart chartId={activeChartId} onBack={backToDashboard} ownerId={user?.sub} />
+        <StructuralTensionChart
+          chartId={activeChartId}
+          chartType={activeChartType}
+          onBack={backToDashboard}
+          ownerId={user?.sub}
+        />
       )}
     </div>
   );

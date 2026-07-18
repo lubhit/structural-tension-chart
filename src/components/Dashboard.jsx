@@ -14,10 +14,33 @@ const getTileStatus = (chart) => {
 
 const TILE_COLORS = {
   idea: '#f4d35e',       // yellow
-  active: '#2e7d32',     // green
+  active: '#f4d35e',     // yellow
   overdue: '#c62828',    // red
-  completed: '#4e342e',  // dark brown
+  completed: '#2e7d32',  // green
 };
+
+const AREA_CONFIG = {
+  work: {
+    title: 'Work Area',
+    ribbonColor: '#0b4f8a',
+    badgeBg: '#d9ecfb',
+    badgeText: '#0b4f8a',
+    sectionBorder: '#c7ddf3',
+    emptyText: 'No work charts yet.',
+    newLabel: '+ New Work Chart',
+  },
+  personal: {
+    title: 'Personal Area',
+    ribbonColor: '#8a2f5a',
+    badgeBg: '#f9dced',
+    badgeText: '#8a2f5a',
+    sectionBorder: '#f2c7dc',
+    emptyText: 'No personal charts yet.',
+    newLabel: '+ New Personal Chart',
+  },
+};
+
+const normalizeChartType = (chart) => chart.chartType === 'personal' ? 'personal' : 'work';
 
 const getTodayStr = () => {
   const now = new Date();
@@ -29,16 +52,45 @@ const getTodayActionItems = (charts, todayStr) => {
   for (const chart of charts) {
     for (const step of chart.steps || []) {
       if (!step.completed && step.dueDate && step.dueDate.slice(0, 10) === todayStr) {
-        items.push({ chartId: chart._id, chartGoal: chart.goal, stepId: step.id, stepText: step.text });
+        items.push({
+          chartId: chart._id,
+          chartType: normalizeChartType(chart),
+          chartGoal: chart.goal,
+          stepId: step.id,
+          stepText: step.text,
+        });
       }
     }
   }
   return items;
 };
 
+const QUICK_ITEMS_KEY_PREFIX = 'stc_quick_items_';
+
+const loadQuickItems = (ownerId) => {
+  try {
+    const raw = localStorage.getItem(QUICK_ITEMS_KEY_PREFIX + (ownerId || 'guest'));
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    console.error("Failed to load quick action items:", err);
+    return [];
+  }
+};
+
+const saveQuickItems = (ownerId, items) => {
+  try {
+    localStorage.setItem(QUICK_ITEMS_KEY_PREFIX + (ownerId || 'guest'), JSON.stringify(items));
+  } catch (err) {
+    console.error("Failed to save quick action items:", err);
+  }
+};
+
 const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [charts, setCharts] = useState([]);
   const [status, setStatus] = useState("loading"); // "loading" | "" | "error"
+  const [quickItems, setQuickItems] = useState([]);
+  const [newQuickText, setNewQuickText] = useState("");
+  const [newQuickDate, setNewQuickDate] = useState("");
 
   const load = async () => {
     setStatus("loading");
@@ -53,8 +105,37 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   };
 
   useEffect(() => { load(); }, [ownerId]);
+  useEffect(() => { setQuickItems(loadQuickItems(ownerId)); }, [ownerId]);
+
+  const handleAddQuickItem = (e) => {
+    e.preventDefault();
+    const text = newQuickText.trim();
+    if (!text) return;
+    const item = { id: Date.now().toString(), text, dueDate: newQuickDate || null, completed: false };
+    const updated = [...quickItems, item];
+    setQuickItems(updated);
+    saveQuickItems(ownerId, updated);
+    setNewQuickText("");
+    setNewQuickDate("");
+  };
+
+  const handleToggleQuickItem = (id) => {
+    const updated = quickItems.map((item) =>
+      item.id === id ? { ...item, completed: !item.completed } : item
+    );
+    setQuickItems(updated);
+    saveQuickItems(ownerId, updated);
+  };
+
+  const handleDeleteQuickItem = (id) => {
+    const updated = quickItems.filter((item) => item.id !== id);
+    setQuickItems(updated);
+    saveQuickItems(ownerId, updated);
+  };
 
   const todayItems = getTodayActionItems(charts, getTodayStr());
+  const workCharts = charts.filter((chart) => normalizeChartType(chart) === 'work');
+  const personalCharts = charts.filter((chart) => normalizeChartType(chart) === 'personal');
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -81,6 +162,7 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
         goalDate: chart.goalDate,
         goalDueDate: chart.goalDueDate,
         currentReality: chart.currentReality,
+        notes: chart.notes,
         currentRealityDate: chart.currentRealityDate,
         status: chart.status,
         ownerId: chart.ownerId,
@@ -97,7 +179,57 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h2 style={{ color: '#003478', margin: 0 }}>My Charts</h2>
-        <button onClick={onNewChart} style={newBtnStyle}>+ New Chart</button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => onNewChart('work')} style={newBtnStyle}>+ Work</button>
+          <button onClick={() => onNewChart('personal')} style={{ ...newBtnStyle, backgroundColor: '#8a2f5a' }}>+ Personal</button>
+        </div>
+      </div>
+
+      <div style={quickSectionStyle}>
+        <h3 style={{ margin: '0 0 12px', color: '#003478', fontSize: '15px' }}>Quick Action Items</h3>
+        <form onSubmit={handleAddQuickItem} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            type="text"
+            value={newQuickText}
+            onChange={(e) => setNewQuickText(e.target.value)}
+            placeholder="Add a standalone task..."
+            style={quickInputStyle}
+          />
+          <input
+            type="date"
+            value={newQuickDate}
+            onChange={(e) => setNewQuickDate(e.target.value)}
+            style={dateInputStyle}
+          />
+          <button type="submit" style={newBtnStyle}>+ Add</button>
+        </form>
+        {quickItems.length === 0 ? (
+          <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No quick action items yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {quickItems.map((item) => (
+              <div key={item.id} style={todayItemStyle}>
+                <div
+                  onClick={() => handleToggleQuickItem(item.id)}
+                  style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}
+                >
+                  <span style={{ color: item.completed ? '#28a745' : '#ccc', fontSize: '16px' }}>
+                    {item.completed ? '✓' : '○'}
+                  </span>
+                  <span style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? '#999' : '#333' }}>
+                    {item.text}
+                  </span>
+                  {item.dueDate && (
+                    <span style={{ color: '#999', fontSize: '12px' }}>Due {new Date(item.dueDate).toLocaleDateString()}</span>
+                  )}
+                </div>
+                <button onClick={() => handleDeleteQuickItem(item.id)} style={completeBtnStyle}>
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {status === "" && todayItems.length > 0 && (
@@ -107,7 +239,7 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
             {todayItems.map((item) => (
               <div
                 key={`${item.chartId}-${item.stepId}`}
-                onClick={() => onOpenChart(item.chartId)}
+                onClick={() => onOpenChart({ id: item.chartId, chartType: item.chartType })}
                 style={todayItemStyle}
               >
                 <div>
@@ -132,34 +264,83 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
       {status === "" && charts.length === 0 && (
         <div style={emptyStateStyle}>
           <p style={{ color: '#999', marginBottom: '15px' }}>No charts yet.</p>
-          <button onClick={onNewChart} style={newBtnStyle}>Create your first chart</button>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+            <button onClick={() => onNewChart('work')} style={newBtnStyle}>Create Work Chart</button>
+            <button onClick={() => onNewChart('personal')} style={{ ...newBtnStyle, backgroundColor: '#8a2f5a' }}>Create Personal Chart</button>
+          </div>
         </div>
       )}
 
+      {status === "" && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <ChartArea
+            type="work"
+            charts={workCharts}
+            config={AREA_CONFIG.work}
+            onNewChart={onNewChart}
+            onOpenChart={onOpenChart}
+            onDelete={handleDelete}
+          />
+          <ChartArea
+            type="personal"
+            charts={personalCharts}
+            config={AREA_CONFIG.personal}
+            onNewChart={onNewChart}
+            onOpenChart={onOpenChart}
+            onDelete={handleDelete}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete }) => (
+  <section style={{ ...areaSectionStyle, borderColor: config.sectionBorder }}>
+    <div style={{ ...areaRibbonStyle, backgroundColor: config.ribbonColor }}>
+      {config.title}
+    </div>
+    {charts.length === 0 ? (
+      <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+        <p style={{ color: '#777', marginBottom: '12px' }}>{config.emptyText}</p>
+        <button onClick={() => onNewChart(type)} style={{ ...newBtnStyle, backgroundColor: config.ribbonColor }}>
+          {config.newLabel}
+        </button>
+      </div>
+    ) : (
       <div style={tileGridStyle}>
-        {charts.map(chart => {
+        {charts.map((chart) => {
           const tileStatus = getTileStatus(chart);
           const bgColor = TILE_COLORS[tileStatus];
-          const textColor = tileStatus === 'idea' ? '#3a2f00' : '#fff';
+          const textColor = tileStatus === 'idea' || tileStatus === 'active' ? '#3a2f00' : '#fff';
           return (
             <div
               key={chart._id}
-              onClick={() => onOpenChart(chart._id)}
+              onClick={() => onOpenChart({ id: chart._id, chartType: normalizeChartType(chart) })}
               style={{ ...tileStyle, backgroundColor: bgColor, color: textColor }}
             >
+              <span
+                style={{
+                  ...typeBadgeStyle,
+                  backgroundColor: config.badgeBg,
+                  color: config.badgeText,
+                }}
+              >
+                {type === 'work' ? 'Work' : 'Personal'}
+              </span>
               <button
-                onClick={(e) => handleDelete(e, chart._id)}
+                onClick={(e) => onDelete(e, chart._id)}
                 style={{ ...deleteBtnStyle, color: textColor, borderColor: textColor }}
               >
                 Delete
               </button>
               <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '10px' }}>
-                {chart.goal ? chart.goal.slice(0, 80) : "(Untitled goal)"}
+                {chart.goal ? chart.goal.slice(0, 80) : '(Untitled goal)'}
               </div>
               <div style={{ fontSize: '12px', opacity: 0.9 }}>
                 {chart.goalDueDate
                   ? `Due ${new Date(chart.goalDueDate).toLocaleDateString()}`
-                  : "No due date set"}
+                  : 'No due date set'}
               </div>
               <div style={{ fontSize: '11px', opacity: 0.75, marginTop: '6px', textTransform: 'capitalize' }}>
                 {chart.status || 'idea'}
@@ -168,9 +349,9 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
           );
         })}
       </div>
-    </div>
-  );
-};
+    )}
+  </section>
+);
 
 const newBtnStyle = {
   padding: '10px 18px',
@@ -189,16 +370,45 @@ const tileGridStyle = {
   gap: '16px',
 };
 
+const areaSectionStyle = {
+  border: '1px solid',
+  borderRadius: '10px',
+  padding: '16px',
+  backgroundColor: '#fff',
+};
+
+const areaRibbonStyle = {
+  color: '#fff',
+  fontWeight: 'bold',
+  fontSize: '14px',
+  letterSpacing: '0.4px',
+  padding: '8px 12px',
+  borderRadius: '6px',
+  width: 'fit-content',
+  marginBottom: '14px',
+};
+
 const tileStyle = {
   position: 'relative',
   borderRadius: '10px',
-  padding: '18px 20px',
+  padding: '42px 20px 18px',
   cursor: 'pointer',
   minHeight: '130px',
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'flex-end',
   boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+};
+
+const typeBadgeStyle = {
+  position: 'absolute',
+  top: '12px',
+  left: '12px',
+  fontSize: '11px',
+  fontWeight: 'bold',
+  letterSpacing: '0.2px',
+  borderRadius: '999px',
+  padding: '4px 10px',
 };
 
 const deleteBtnStyle = {
@@ -219,6 +429,33 @@ const todaySectionStyle = {
   borderRadius: '8px',
   padding: '16px 20px',
   marginBottom: '30px',
+};
+
+const quickSectionStyle = {
+  backgroundColor: '#f5f7fa',
+  border: '1px solid #dbe4ee',
+  borderRadius: '8px',
+  padding: '16px 20px',
+  marginBottom: '30px',
+};
+
+const quickInputStyle = {
+  flex: 1,
+  border: '1px solid #ccc',
+  borderRadius: '4px',
+  padding: '8px 10px',
+  fontSize: '13px',
+  fontFamily: 'inherit',
+};
+
+const dateInputStyle = {
+  border: '1px solid #ccc',
+  borderRadius: '4px',
+  padding: '8px 10px',
+  fontSize: '13px',
+  fontFamily: 'inherit',
+  color: '#555',
+  flexShrink: 0,
 };
 
 const todayItemStyle = {

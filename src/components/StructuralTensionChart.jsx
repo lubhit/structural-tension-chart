@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getChart, createChart, updateChart } from '../api';
 
 const escapeICSText = (str) =>
@@ -23,8 +23,12 @@ const buildStepICS = (title, description, dueDate) => {
   ].filter(Boolean).join('\r\n');
 };
 
-const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) => {
+const buildSnapshot = (vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType) =>
+  JSON.stringify({ vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType });
+
+const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialChartType = 'work', onBack, ownerId }) => {
   const [chartId, setChartId] = useState(initialChartId || null);
+  const [chartType, setChartType] = useState(initialChartType);
   const [vision, setVision] = useState("");
   const [goalDueDate, setGoalDueDate] = useState("");
   const [realityText, setRealityText] = useState("");
@@ -36,6 +40,8 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
   const [manuallyCompleted, setManuallyCompleted] = useState(false);
   const [status, setStatus] = useState(""); // "loading" | "saving" | "saved" | "error" | ""
   const [showDropSavePopup, setShowDropSavePopup] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const savedSnapshotRef = useRef(null);
 
   // --- LOAD ON MOUNT (only if editing an existing chart) ---
   useEffect(() => {
@@ -45,19 +51,27 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
       try {
         const chart = await getChart(initialChartId);
         if (chart) {
+          const loadedChartType = chart.chartType === 'personal' ? 'personal' : initialChartType;
+          const loadedGoalDueDate = chart.goalDueDate ? chart.goalDueDate.slice(0, 10) : "";
+          const steps = chart.steps || [];
+          const loadedActionSteps = steps.filter(s => !s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }));
+          const loadedCompletedSteps = steps.filter(s => s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }));
+          const loadedManuallyCompleted = chart.status === 'completed';
+
           setChartId(chart._id);
+          setChartType(loadedChartType);
           setVision(chart.goal || "");
-          setGoalDueDate(chart.goalDueDate ? chart.goalDueDate.slice(0, 10) : "");
+          setGoalDueDate(loadedGoalDueDate);
           setRealityText(chart.currentReality || "");
           setNotes(chart.notes || "");
-          const steps = chart.steps || [];
-          setActionSteps(
-            steps.filter(s => !s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }))
+          setActionSteps(loadedActionSteps);
+          setCompletedSteps(loadedCompletedSteps);
+          setManuallyCompleted(loadedManuallyCompleted);
+
+          savedSnapshotRef.current = buildSnapshot(
+            chart.goal || "", loadedGoalDueDate, chart.currentReality || "", chart.notes || "",
+            loadedActionSteps, loadedCompletedSteps, loadedManuallyCompleted, loadedChartType
           );
-          setCompletedSteps(
-            steps.filter(s => s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }))
-          );
-          setManuallyCompleted(chart.status === 'completed');
         }
         setStatus("");
       } catch (err) {
@@ -67,6 +81,14 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
     };
     load();
   }, [initialChartId]);
+
+  useEffect(() => {
+    if (!initialChartId) {
+      setChartType(initialChartType);
+      savedSnapshotRef.current = buildSnapshot("", "", "", "", actionSteps, [], false, initialChartType);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialChartId, initialChartType]);
 
   // --- SAVE ---
   // Accepts optional overrides so callers (like the drag-and-drop handler) can save
@@ -87,6 +109,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
         notes,
         currentRealityDate: new Date(),
         status: computedStatus,
+        chartType,
         ownerId,
         steps: [
           ...stepsForActive.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
@@ -100,6 +123,9 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
         const created = await createChart(payload);
         setChartId(created._id);
       }
+      savedSnapshotRef.current = buildSnapshot(
+        vision, goalDueDate, realityText, notes, stepsForActive, stepsForCompleted, manuallyCompleted, chartType
+      );
       setStatus("saved");
       setTimeout(() => setStatus(""), 1500);
     } catch (err) {
@@ -138,6 +164,31 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
 
   const allowDrop = (e) => e.preventDefault();
 
+  const isDirty = () => {
+    if (savedSnapshotRef.current === null) return false;
+    const current = buildSnapshot(vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType);
+    return current !== savedSnapshotRef.current;
+  };
+
+  const handleBackClick = () => {
+    if (isDirty()) {
+      setShowExitConfirm(true);
+    } else {
+      onBack();
+    }
+  };
+
+  const handleSaveAndExit = async () => {
+    await handleSave();
+    setShowExitConfirm(false);
+    onBack();
+  };
+
+  const handleDiscardAndExit = () => {
+    setShowExitConfirm(false);
+    onBack();
+  };
+
   const addEmptyStep = () => {
     const newStep = { id: Date.now().toString(), text: "", dueDate: "" };
     setActionSteps([...actionSteps, newStep]);
@@ -155,8 +206,17 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
   return (
     <div style={{ padding: '20px', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <button onClick={onBack} style={backBtnStyle}>← Back to Dashboard</button>
+        <button onClick={handleBackClick} style={backBtnStyle}>← Back to Dashboard</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <select
+            value={chartType}
+            onChange={(e) => setChartType(e.target.value)}
+            style={typeSelectStyle}
+            title="Chart Area"
+          >
+            <option value="work">Work</option>
+            <option value="personal">Personal</option>
+          </select>
           {status === "loading" && <span style={{ fontSize: '12px', color: '#999' }}>Loading...</span>}
           {status === "saved" && <span style={{ fontSize: '12px', color: '#28a745' }}>Saved ✓</span>}
           {status === "error" && <span style={{ fontSize: '12px', color: '#dc3545' }}>Error saving</span>}
@@ -298,6 +358,21 @@ const StructuralTensionChart = ({ chartId: initialChartId, onBack, ownerId }) =>
         </div>
 
       </div>
+
+      {showExitConfirm && (
+        <div style={modalOverlayStyle}>
+          <div style={modalBoxStyle}>
+            <p style={{ margin: '0 0 16px', fontSize: '14px', color: '#333' }}>
+              You have unsaved changes. Save before leaving?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setShowExitConfirm(false)} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={handleDiscardAndExit} style={modalDiscardBtnStyle}>Discard</button>
+              <button onClick={handleSaveAndExit} style={modalSaveBtnStyle}>Save & Exit</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -412,6 +487,68 @@ const backBtnStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '13px',
+};
+
+const modalOverlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000,
+};
+
+const modalBoxStyle = {
+  backgroundColor: 'white',
+  borderRadius: '8px',
+  padding: '20px 24px',
+  minWidth: '320px',
+  boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+};
+
+const modalCancelBtnStyle = {
+  padding: '8px 14px',
+  backgroundColor: 'transparent',
+  border: '1px solid #ccc',
+  color: '#555',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '13px',
+};
+
+const modalDiscardBtnStyle = {
+  padding: '8px 14px',
+  backgroundColor: 'transparent',
+  border: '1px solid #dc3545',
+  color: '#dc3545',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: 'bold',
+};
+
+const modalSaveBtnStyle = {
+  padding: '8px 14px',
+  backgroundColor: '#003478',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: 'bold',
+};
+
+const typeSelectStyle = {
+  border: '1px solid #ccc',
+  borderRadius: '4px',
+  padding: '6px 10px',
+  fontSize: '12px',
+  color: '#444',
+  backgroundColor: '#fff',
 };
 
 const labelStyle = { display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '8px', color: '#555', letterSpacing: '0.5px' };
