@@ -20,6 +20,8 @@ const TILE_COLORS = {
   completed: '#2e7d32',  // green
 };
 
+const TEMPLATE_TILE_COLOR = '#5e4b8a'; // purple, always used for template tiles regardless of status
+
 const AREA_CONFIG = {
   work: {
     title: 'Work Area',
@@ -482,8 +484,8 @@ const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete, on
         <div style={tileGridStyle}>
           {charts.map((chart) => {
             const tileStatus = getTileStatus(chart);
-            const bgColor = TILE_COLORS[tileStatus];
-            const textColor = tileStatus === 'idea' || tileStatus === 'active' ? '#3a2f00' : '#fff';
+            const bgColor = isTemplateArea ? TEMPLATE_TILE_COLOR : TILE_COLORS[tileStatus];
+            const textColor = isTemplateArea ? '#fff' : (tileStatus === 'idea' || tileStatus === 'active' ? '#3a2f00' : '#fff');
             return (
               <div
                 key={chart._id}
