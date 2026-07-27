@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getChart, createChart, updateChart } from '../api';
+import { OFFSET_OPTIONS } from '../templateOffsets';
 
 const escapeICSText = (str) =>
   String(str).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
@@ -29,6 +30,7 @@ const buildSnapshot = (vision, goalDueDate, realityText, notes, actionSteps, com
 const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialChartType = 'work', onBack, ownerId }) => {
   const [chartId, setChartId] = useState(initialChartId || null);
   const [chartType, setChartType] = useState(initialChartType);
+  const [isTemplate, setIsTemplate] = useState(false);
   const [vision, setVision] = useState("");
   const [goalDueDate, setGoalDueDate] = useState("");
   const [realityText, setRealityText] = useState("");
@@ -54,12 +56,13 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
           const loadedChartType = chart.chartType === 'personal' ? 'personal' : initialChartType;
           const loadedGoalDueDate = chart.goalDueDate ? chart.goalDueDate.slice(0, 10) : "";
           const steps = chart.steps || [];
-          const loadedActionSteps = steps.filter(s => !s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }));
-          const loadedCompletedSteps = steps.filter(s => s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "" }));
+          const loadedActionSteps = steps.filter(s => !s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "", offsetDays: s.offsetDays ?? null }));
+          const loadedCompletedSteps = steps.filter(s => s.completed).map(s => ({ id: String(s.id), text: s.text, dueDate: s.dueDate ? s.dueDate.slice(0, 10) : "", offsetDays: s.offsetDays ?? null }));
           const loadedManuallyCompleted = chart.status === 'completed';
 
           setChartId(chart._id);
           setChartType(loadedChartType);
+          setIsTemplate(!!chart.isTemplate);
           setVision(chart.goal || "");
           setGoalDueDate(loadedGoalDueDate);
           setRealityText(chart.currentReality || "");
@@ -85,6 +88,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
   useEffect(() => {
     if (!initialChartId) {
       setChartType(initialChartType);
+      setIsTemplate(false);
       savedSnapshotRef.current = buildSnapshot("", "", "", "", actionSteps, [], false, initialChartType);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -104,16 +108,17 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
       const payload = {
         goal: vision,
         goalDate: new Date(),
-        goalDueDate: goalDueDate ? new Date(goalDueDate) : null,
+        goalDueDate: isTemplate ? null : (goalDueDate ? new Date(goalDueDate) : null),
         currentReality: realityText,
         notes,
         currentRealityDate: new Date(),
         status: computedStatus,
         chartType,
         ownerId,
+        isTemplate,
         steps: [
-          ...stepsForActive.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
-          ...stepsForCompleted.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: s.dueDate ? new Date(s.dueDate) : null })),
+          ...stepsForActive.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: false, date: new Date(), dueDate: (!isTemplate && s.dueDate) ? new Date(s.dueDate) : null, offsetDays: isTemplate ? (s.offsetDays ?? null) : null })),
+          ...stepsForCompleted.map(s => ({ id: Number(s.id) || Date.now(), text: s.text, completed: true, date: new Date(), dueDate: (!isTemplate && s.dueDate) ? new Date(s.dueDate) : null, offsetDays: isTemplate ? (s.offsetDays ?? null) : null })),
         ],
       };
 
@@ -190,7 +195,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
   };
 
   const addEmptyStep = () => {
-    const newStep = { id: Date.now().toString(), text: "", dueDate: "" };
+    const newStep = { id: Date.now().toString(), text: "", dueDate: "", offsetDays: null };
     setActionSteps([...actionSteps, newStep]);
   };
 
@@ -249,12 +254,18 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
           />
           <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#555', letterSpacing: '0.5px' }}>GOAL DUE DATE</label>
-            <input
-              type="date"
-              value={goalDueDate}
-              onChange={(e) => setGoalDueDate(e.target.value)}
-              style={dateInputStyle}
-            />
+            {isTemplate ? (
+              <span style={{ fontSize: '12px', color: '#888', fontStyle: 'italic' }}>
+                Set when you create a chart from this template
+              </span>
+            ) : (
+              <input
+                type="date"
+                value={goalDueDate}
+                onChange={(e) => setGoalDueDate(e.target.value)}
+                style={dateInputStyle}
+              />
+            )}
           </div>
         </div>
 
@@ -282,24 +293,43 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
                   placeholder="Enter a task..."
                   style={{ border: 'none', background: 'transparent', width: '100%', outline: 'none', fontSize: '14px' }}
                 />
-                <input
-                  type="date"
-                  value={step.dueDate || ""}
-                  onChange={(e) => {
-                    const newSteps = [...actionSteps];
-                    newSteps[index].dueDate = e.target.value;
-                    setActionSteps(newSteps);
-                  }}
-                  style={dateInputStyle}
-                />
-                <button
-                  onClick={() => addStepToCalendar(step)}
-                  disabled={!step.dueDate || !step.text}
-                  title={step.dueDate ? "Add to Calendar" : "Set a due date first"}
-                  style={{ ...calendarBtnStyle, opacity: (!step.dueDate || !step.text) ? 0.4 : 1, cursor: (!step.dueDate || !step.text) ? 'not-allowed' : 'pointer' }}
-                >
-                  📅
-                </button>
+                {isTemplate ? (
+                  <select
+                    value={step.offsetDays ?? ""}
+                    onChange={(e) => {
+                      const newSteps = [...actionSteps];
+                      newSteps[index].offsetDays = e.target.value === "" ? null : Number(e.target.value);
+                      setActionSteps(newSteps);
+                    }}
+                    style={dateInputStyle}
+                  >
+                    <option value="">No specific timing</option>
+                    {OFFSET_OPTIONS.map((opt) => (
+                      <option key={opt.days} value={opt.days}>{opt.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      type="date"
+                      value={step.dueDate || ""}
+                      onChange={(e) => {
+                        const newSteps = [...actionSteps];
+                        newSteps[index].dueDate = e.target.value;
+                        setActionSteps(newSteps);
+                      }}
+                      style={dateInputStyle}
+                    />
+                    <button
+                      onClick={() => addStepToCalendar(step)}
+                      disabled={!step.dueDate || !step.text}
+                      title={step.dueDate ? "Add to Calendar" : "Set a due date first"}
+                      style={{ ...calendarBtnStyle, opacity: (!step.dueDate || !step.text) ? 0.4 : 1, cursor: (!step.dueDate || !step.text) ? 'not-allowed' : 'pointer' }}
+                    >
+                      📅
+                    </button>
+                  </>
+                )}
               </div>
             ))}
 

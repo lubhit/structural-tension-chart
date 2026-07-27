@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { listCharts, deleteChart, getChart, updateChart, createChart } from '../api';
+import { offsetFromDates, dateFromOffset } from '../templateOffsets';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -62,9 +63,9 @@ const buildDefaultTemplate = (ownerId) => ({
   ownerId,
   isTemplate: true,
   steps: [
-    { id: 1, text: 'Research the topic and gather learning resources', completed: false, date: new Date(), dueDate: null },
-    { id: 2, text: 'Practice for 30 minutes each day', completed: false, date: new Date(), dueDate: null },
-    { id: 3, text: 'Review progress weekly and adjust the plan', completed: false, date: new Date(), dueDate: null },
+    { id: 1, text: 'Research the topic and gather learning resources', completed: false, date: new Date(), dueDate: null, offsetDays: 21 },
+    { id: 2, text: 'Practice for 30 minutes each day', completed: false, date: new Date(), dueDate: null, offsetDays: 7 },
+    { id: 3, text: 'Review progress weekly and adjust the plan', completed: false, date: new Date(), dueDate: null, offsetDays: 1 },
   ],
 });
 
@@ -120,6 +121,8 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [newQuickText, setNewQuickText] = useState("");
   const [newQuickDate, setNewQuickDate] = useState("");
   const [banner, setBanner] = useState("");
+  const [useTemplateTarget, setUseTemplateTarget] = useState(null);
+  const [useTemplateDueDate, setUseTemplateDueDate] = useState("");
 
   const showBanner = (text) => {
     setBanner(text);
@@ -211,7 +214,14 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
         chartType: normalizeChartType(full),
         ownerId,
         isTemplate: true,
-        steps: (full.steps || []).map(s => ({ id: s.id, text: s.text, completed: false, date: new Date(), dueDate: null })),
+        steps: (full.steps || []).map(s => ({
+          id: s.id,
+          text: s.text,
+          completed: false,
+          date: new Date(),
+          dueDate: null,
+          offsetDays: offsetFromDates(full.goalDueDate, s.dueDate),
+        })),
       });
       showBanner('Saved as template. You can now delete the original chart if you like.');
       load();
@@ -221,16 +231,27 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
-  const handleUseTemplate = async (e, template) => {
+  const handleUseTemplate = (e, template) => {
     e.stopPropagation();
+    setUseTemplateTarget(template);
+    setUseTemplateDueDate("");
+  };
+
+  const closeUseTemplateModal = () => {
+    setUseTemplateTarget(null);
+    setUseTemplateDueDate("");
+  };
+
+  const confirmUseTemplate = async () => {
     try {
-      const full = await getChart(template._id);
+      const full = await getChart(useTemplateTarget._id);
       if (!full) return;
       const chartType = normalizeChartType(full);
+      const goalDueDate = useTemplateDueDate ? new Date(useTemplateDueDate) : null;
       const created = await createChart({
         goal: full.goal,
         goalDate: new Date(),
-        goalDueDate: null,
+        goalDueDate,
         currentReality: full.currentReality,
         notes: full.notes,
         currentRealityDate: new Date(),
@@ -238,8 +259,16 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
         chartType,
         ownerId,
         isTemplate: false,
-        steps: (full.steps || []).map(s => ({ id: s.id, text: s.text, completed: false, date: new Date(), dueDate: null })),
+        steps: (full.steps || []).map(s => ({
+          id: s.id,
+          text: s.text,
+          completed: false,
+          date: new Date(),
+          dueDate: dateFromOffset(goalDueDate, s.offsetDays),
+          offsetDays: null,
+        })),
       });
+      closeUseTemplateModal();
       onOpenChart({ id: created._id, chartType });
     } catch (err) {
       console.error("Failed to create chart from template:", err);
@@ -401,6 +430,34 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
           />
         </div>
       )}
+
+      {useTemplateTarget && (
+        <div style={modalOverlayStyle}>
+          <div style={modalBoxStyle}>
+            <p style={{ margin: '0 0 6px', fontSize: '14px', color: '#333', fontWeight: 'bold' }}>
+              Create a chart from "{useTemplateTarget.goal ? useTemplateTarget.goal.slice(0, 60) : 'this template'}"
+            </p>
+            <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#777' }}>
+              This template's steps are timed relative to the goal due date (e.g. "2 weeks before").
+              Set a goal due date to have those steps automatically get real due dates, or leave it
+              blank and fill in dates later.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#555' }}>GOAL DUE DATE</label>
+              <input
+                type="date"
+                value={useTemplateDueDate}
+                onChange={(e) => setUseTemplateDueDate(e.target.value)}
+                style={dateInputStyle}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={closeUseTemplateModal} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={confirmUseTemplate} style={modalSaveBtnStyle}>Create Chart</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -555,6 +612,49 @@ const deleteBtnStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '11px',
+};
+
+const modalOverlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 1000,
+};
+
+const modalBoxStyle = {
+  backgroundColor: 'white',
+  borderRadius: '8px',
+  padding: '20px 24px',
+  minWidth: '320px',
+  maxWidth: '420px',
+  boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+};
+
+const modalCancelBtnStyle = {
+  padding: '8px 14px',
+  backgroundColor: 'transparent',
+  border: '1px solid #ccc',
+  color: '#555',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '13px',
+};
+
+const modalSaveBtnStyle = {
+  padding: '8px 14px',
+  backgroundColor: '#003478',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: 'bold',
 };
 
 const footerBtnStyle = {
