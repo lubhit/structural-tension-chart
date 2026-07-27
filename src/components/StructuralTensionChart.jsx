@@ -189,6 +189,18 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
     return current !== savedSnapshotRef.current;
   };
 
+  // Warn on browser-level exits (tab close, refresh, navigating away) that
+  // don't go through handleBackClick and its own unsaved-changes prompt.
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (!isDirty()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  });
+
   const handleBackClick = () => {
     if (isDirty()) {
       setShowExitConfirm(true);
