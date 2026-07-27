@@ -27,6 +27,20 @@ const buildStepICS = (title, description, dueDate) => {
 const buildSnapshot = (vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType) =>
   JSON.stringify({ vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType });
 
+// Orders pending steps so the most imminent one is on top: for a template
+// that's the smallest "days before" offset (e.g. 1 week before, before
+// 1 month before); for a real chart it's the soonest due date. Steps with
+// no timing set sort to the bottom either way.
+const stepTimingValue = (step, isTemplate) => {
+  if (isTemplate) {
+    return (step.offsetDays === null || step.offsetDays === undefined) ? Infinity : step.offsetDays;
+  }
+  return step.dueDate ? new Date(step.dueDate).getTime() : Infinity;
+};
+
+const sortStepsByTiming = (steps, isTemplate) =>
+  [...steps].sort((a, b) => stepTimingValue(a, isTemplate) - stepTimingValue(b, isTemplate));
+
 const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialChartType = 'work', onBack, ownerId }) => {
   const [chartId, setChartId] = useState(initialChartId || null);
   const [chartType, setChartType] = useState(initialChartType);
@@ -275,7 +289,9 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
           <div style={stepsWrapper}>
             <div style={tensionLabel}>PENDING ACTION STEPS (DRAG DOWN)</div>
 
-            {actionSteps.map((step, index) => (
+            {sortStepsByTiming(actionSteps, isTemplate).map((step) => {
+              const index = actionSteps.indexOf(step);
+              return (
               <div
                 key={step.id}
                 draggable
@@ -331,7 +347,8 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
                   </>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             <button onClick={addEmptyStep} style={addBtnStyle}>+ Add Step</button>
           </div>
