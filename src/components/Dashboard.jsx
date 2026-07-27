@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listCharts, deleteChart, getChart, updateChart } from '../api';
+import { listCharts, deleteChart, getChart, updateChart, createChart } from '../api';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -38,7 +38,35 @@ const AREA_CONFIG = {
     emptyText: 'No personal charts yet.',
     newLabel: '+ New Personal Chart',
   },
+  template: {
+    title: 'Templates',
+    ribbonColor: '#5e4b8a',
+    badgeBg: '#eae3f5',
+    badgeText: '#5e4b8a',
+    sectionBorder: '#dccbee',
+    emptyText: 'No templates yet.',
+  },
 };
+
+const TEMPLATE_SEEDED_KEY_PREFIX = 'stc_template_seeded_';
+
+const buildDefaultTemplate = (ownerId) => ({
+  goal: 'Example: Learn a new skill in 90 days',
+  goalDate: new Date(),
+  goalDueDate: null,
+  currentReality: "I haven't studied this topic before and don't know where to start.",
+  notes: 'This is a starter template showing how a Structural Tension Chart is put together. Click "Use Template" to create your own chart from this structure, then customize the vision, steps, and reality.',
+  currentRealityDate: new Date(),
+  status: 'idea',
+  chartType: 'work',
+  ownerId,
+  isTemplate: true,
+  steps: [
+    { id: 1, text: 'Research the topic and gather learning resources', completed: false, date: new Date(), dueDate: null },
+    { id: 2, text: 'Practice for 30 minutes each day', completed: false, date: new Date(), dueDate: null },
+    { id: 3, text: 'Review progress weekly and adjust the plan', completed: false, date: new Date(), dueDate: null },
+  ],
+});
 
 const normalizeChartType = (chart) => chart.chartType === 'personal' ? 'personal' : 'work';
 
@@ -91,11 +119,27 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [quickItems, setQuickItems] = useState([]);
   const [newQuickText, setNewQuickText] = useState("");
   const [newQuickDate, setNewQuickDate] = useState("");
+  const [banner, setBanner] = useState("");
+
+  const showBanner = (text) => {
+    setBanner(text);
+    setTimeout(() => setBanner(""), 2500);
+  };
 
   const load = async () => {
     setStatus("loading");
     try {
-      const data = await listCharts(ownerId);
+      let data = await listCharts(ownerId);
+      const seededKey = TEMPLATE_SEEDED_KEY_PREFIX + (ownerId || 'guest');
+      if (!data.some((c) => c.isTemplate) && !localStorage.getItem(seededKey)) {
+        localStorage.setItem(seededKey, '1');
+        try {
+          await createChart(buildDefaultTemplate(ownerId));
+          data = await listCharts(ownerId);
+        } catch (seedErr) {
+          console.error("Failed to seed default template:", seedErr);
+        }
+      }
       setCharts(data);
       setStatus("");
     } catch (err) {
@@ -133,9 +177,11 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     saveQuickItems(ownerId, updated);
   };
 
-  const todayItems = getTodayActionItems(charts, getTodayStr());
-  const workCharts = charts.filter((chart) => normalizeChartType(chart) === 'work');
-  const personalCharts = charts.filter((chart) => normalizeChartType(chart) === 'personal');
+  const nonTemplateCharts = charts.filter((chart) => !chart.isTemplate);
+  const todayItems = getTodayActionItems(nonTemplateCharts, getTodayStr());
+  const workCharts = nonTemplateCharts.filter((chart) => normalizeChartType(chart) === 'work');
+  const personalCharts = nonTemplateCharts.filter((chart) => normalizeChartType(chart) === 'personal');
+  const templateCharts = charts.filter((chart) => chart.isTemplate);
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -146,6 +192,58 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     } catch (err) {
       console.error("Failed to delete chart:", err);
       alert("Failed to delete chart.");
+    }
+  };
+
+  const handleSaveAsTemplate = async (e, chart) => {
+    e.stopPropagation();
+    try {
+      const full = await getChart(chart._id);
+      if (!full) return;
+      await createChart({
+        goal: full.goal,
+        goalDate: new Date(),
+        goalDueDate: null,
+        currentReality: full.currentReality,
+        notes: full.notes,
+        currentRealityDate: new Date(),
+        status: 'idea',
+        chartType: normalizeChartType(full),
+        ownerId,
+        isTemplate: true,
+        steps: (full.steps || []).map(s => ({ id: s.id, text: s.text, completed: false, date: new Date(), dueDate: null })),
+      });
+      showBanner('Saved as template. You can now delete the original chart if you like.');
+      load();
+    } catch (err) {
+      console.error("Failed to save as template:", err);
+      alert("Failed to save as template.");
+    }
+  };
+
+  const handleUseTemplate = async (e, template) => {
+    e.stopPropagation();
+    try {
+      const full = await getChart(template._id);
+      if (!full) return;
+      const chartType = normalizeChartType(full);
+      const created = await createChart({
+        goal: full.goal,
+        goalDate: new Date(),
+        goalDueDate: null,
+        currentReality: full.currentReality,
+        notes: full.notes,
+        currentRealityDate: new Date(),
+        status: 'idea',
+        chartType,
+        ownerId,
+        isTemplate: false,
+        steps: (full.steps || []).map(s => ({ id: s.id, text: s.text, completed: false, date: new Date(), dueDate: null })),
+      });
+      onOpenChart({ id: created._id, chartType });
+    } catch (err) {
+      console.error("Failed to create chart from template:", err);
+      alert("Failed to create chart from template.");
     }
   };
 
@@ -184,6 +282,8 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
           <button onClick={() => onNewChart('personal')} style={{ ...newBtnStyle, backgroundColor: '#8a2f5a' }}>+ Personal</button>
         </div>
       </div>
+
+      {banner && <div style={bannerStyle}>{banner}</div>}
 
       <div style={quickSectionStyle}>
         <h3 style={{ margin: '0 0 12px', color: '#003478', fontSize: '15px' }}>Quick Action Items</h3>
@@ -261,7 +361,7 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
       {status === "loading" && <p style={{ color: '#999' }}>Loading charts...</p>}
       {status === "error" && <p style={{ color: '#dc3545' }}>Failed to load charts. Is stc-api running?</p>}
 
-      {status === "" && charts.length === 0 && (
+      {status === "" && nonTemplateCharts.length === 0 && (
         <div style={emptyStateStyle}>
           <p style={{ color: '#999', marginBottom: '15px' }}>No charts yet.</p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
@@ -280,6 +380,7 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
             onNewChart={onNewChart}
             onOpenChart={onOpenChart}
             onDelete={handleDelete}
+            onSaveAsTemplate={handleSaveAsTemplate}
           />
           <ChartArea
             type="personal"
@@ -288,6 +389,15 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
             onNewChart={onNewChart}
             onOpenChart={onOpenChart}
             onDelete={handleDelete}
+            onSaveAsTemplate={handleSaveAsTemplate}
+          />
+          <ChartArea
+            type="template"
+            charts={templateCharts}
+            config={AREA_CONFIG.template}
+            onOpenChart={onOpenChart}
+            onDelete={handleDelete}
+            onUseTemplate={handleUseTemplate}
           />
         </div>
       )}
@@ -295,63 +405,87 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   );
 };
 
-const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete }) => (
-  <section style={{ ...areaSectionStyle, borderColor: config.sectionBorder }}>
-    <div style={{ ...areaRibbonStyle, backgroundColor: config.ribbonColor }}>
-      {config.title}
-    </div>
-    {charts.length === 0 ? (
-      <div style={{ textAlign: 'center', padding: '20px 10px' }}>
-        <p style={{ color: '#777', marginBottom: '12px' }}>{config.emptyText}</p>
-        <button onClick={() => onNewChart(type)} style={{ ...newBtnStyle, backgroundColor: config.ribbonColor }}>
-          {config.newLabel}
-        </button>
+const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete, onSaveAsTemplate, onUseTemplate }) => {
+  const isTemplateArea = type === 'template';
+  return (
+    <section style={{ ...areaSectionStyle, borderColor: config.sectionBorder }}>
+      <div style={{ ...areaRibbonStyle, backgroundColor: config.ribbonColor }}>
+        {config.title}
       </div>
-    ) : (
-      <div style={tileGridStyle}>
-        {charts.map((chart) => {
-          const tileStatus = getTileStatus(chart);
-          const bgColor = TILE_COLORS[tileStatus];
-          const textColor = tileStatus === 'idea' || tileStatus === 'active' ? '#3a2f00' : '#fff';
-          return (
-            <div
-              key={chart._id}
-              onClick={() => onOpenChart({ id: chart._id, chartType: normalizeChartType(chart) })}
-              style={{ ...tileStyle, backgroundColor: bgColor, color: textColor }}
-            >
-              <span
-                style={{
-                  ...typeBadgeStyle,
-                  backgroundColor: config.badgeBg,
-                  color: config.badgeText,
-                }}
+      {charts.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+          <p style={{ color: '#777', marginBottom: '12px' }}>{config.emptyText}</p>
+          {!isTemplateArea && (
+            <button onClick={() => onNewChart(type)} style={{ ...newBtnStyle, backgroundColor: config.ribbonColor }}>
+              {config.newLabel}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={tileGridStyle}>
+          {charts.map((chart) => {
+            const tileStatus = getTileStatus(chart);
+            const bgColor = TILE_COLORS[tileStatus];
+            const textColor = tileStatus === 'idea' || tileStatus === 'active' ? '#3a2f00' : '#fff';
+            return (
+              <div
+                key={chart._id}
+                onClick={() => onOpenChart({ id: chart._id, chartType: normalizeChartType(chart) })}
+                style={{ ...tileStyle, backgroundColor: bgColor, color: textColor }}
               >
-                {type === 'work' ? 'Work' : 'Personal'}
-              </span>
-              <button
-                onClick={(e) => onDelete(e, chart._id)}
-                style={{ ...deleteBtnStyle, color: textColor, borderColor: textColor }}
-              >
-                Delete
-              </button>
-              <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '10px' }}>
-                {chart.goal ? chart.goal.slice(0, 80) : '(Untitled goal)'}
+                <span
+                  style={{
+                    ...typeBadgeStyle,
+                    backgroundColor: config.badgeBg,
+                    color: config.badgeText,
+                  }}
+                >
+                  {isTemplateArea ? 'Template' : (type === 'work' ? 'Work' : 'Personal')}
+                </span>
+                <button
+                  onClick={(e) => onDelete(e, chart._id)}
+                  style={{ ...deleteBtnStyle, color: textColor, borderColor: textColor }}
+                >
+                  Delete
+                </button>
+                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '10px' }}>
+                  {chart.goal ? chart.goal.slice(0, 80) : '(Untitled goal)'}
+                </div>
+                {!isTemplateArea && (
+                  <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                    {chart.goalDueDate
+                      ? `Due ${new Date(chart.goalDueDate).toLocaleDateString()}`
+                      : 'No due date set'}
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', opacity: 0.75, marginTop: '6px', textTransform: 'capitalize' }}>
+                  {chart.status || 'idea'}
+                </div>
+                <div style={{ marginTop: '10px' }}>
+                  {isTemplateArea ? (
+                    <button
+                      onClick={(e) => onUseTemplate(e, chart)}
+                      style={{ ...footerBtnStyle, color: textColor, borderColor: textColor }}
+                    >
+                      Use Template
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => onSaveAsTemplate(e, chart)}
+                      style={{ ...footerBtnStyle, color: textColor, borderColor: textColor }}
+                    >
+                      Save as Template
+                    </button>
+                  )}
+                </div>
               </div>
-              <div style={{ fontSize: '12px', opacity: 0.9 }}>
-                {chart.goalDueDate
-                  ? `Due ${new Date(chart.goalDueDate).toLocaleDateString()}`
-                  : 'No due date set'}
-              </div>
-              <div style={{ fontSize: '11px', opacity: 0.75, marginTop: '6px', textTransform: 'capitalize' }}>
-                {chart.status || 'idea'}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-  </section>
-);
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+};
 
 const newBtnStyle = {
   padding: '10px 18px',
@@ -421,6 +555,27 @@ const deleteBtnStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '11px',
+};
+
+const footerBtnStyle = {
+  padding: '5px 10px',
+  backgroundColor: 'transparent',
+  border: '1px solid currentColor',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '11px',
+  fontWeight: 'bold',
+};
+
+const bannerStyle = {
+  backgroundColor: '#e8f5e9',
+  border: '1px solid #28a745',
+  color: '#1b5e20',
+  borderRadius: '8px',
+  padding: '10px 16px',
+  fontSize: '13px',
+  fontWeight: 'bold',
+  marginBottom: '20px',
 };
 
 const todaySectionStyle = {
