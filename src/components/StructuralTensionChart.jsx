@@ -253,7 +253,9 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
         </div>
       </div>
 
-      <h2 style={{ color: '#003478', textAlign: 'center', marginBottom: '30px' }}>Structural Tension Model</h2>
+      <h2 style={{ color: '#003478', textAlign: 'center', marginBottom: '30px' }}>
+        {vision.split('\n')[0].trim() || 'Structural Tension Model'}
+      </h2>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
