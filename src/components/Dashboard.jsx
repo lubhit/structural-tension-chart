@@ -188,6 +188,9 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     saveQuickItems(ownerId, updated);
   };
 
+  const pendingQuickItems = quickItems.filter((item) => !item.completed);
+  const completedQuickItems = quickItems.filter((item) => item.completed);
+
   const nonTemplateCharts = charts.filter((chart) => !chart.isTemplate);
   const activeCharts = nonTemplateCharts.filter((chart) => chart.status !== 'completed');
   const todayItems = getTodayActionItems(activeCharts, getTodayStr());
@@ -345,29 +348,55 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
         {quickItems.length === 0 ? (
           <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No quick action items yet.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {quickItems.map((item) => (
-              <div key={item.id} style={todayItemStyle}>
-                <div
-                  onClick={() => handleToggleQuickItem(item.id)}
-                  style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}
-                >
-                  <span style={{ color: item.completed ? '#28a745' : '#ccc', fontSize: '16px' }}>
-                    {item.completed ? '✓' : '○'}
-                  </span>
-                  <span style={{ textDecoration: item.completed ? 'line-through' : 'none', color: item.completed ? '#999' : '#333' }}>
-                    {item.text}
-                  </span>
-                  {item.dueDate && (
-                    <span style={{ color: '#999', fontSize: '12px' }}>Due {new Date(item.dueDate).toLocaleDateString()}</span>
-                  )}
-                </div>
-                <button onClick={() => handleDeleteQuickItem(item.id)} style={completeBtnStyle}>
-                  Delete
-                </button>
+          <>
+            {pendingQuickItems.length === 0 ? (
+              <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No pending quick action items.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {pendingQuickItems.map((item) => (
+                  <div key={item.id} style={todayItemStyle}>
+                    <div
+                      onClick={() => handleToggleQuickItem(item.id)}
+                      style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}
+                    >
+                      <span style={{ color: '#ccc', fontSize: '16px' }}>○</span>
+                      <span style={{ color: '#333' }}>{item.text}</span>
+                      {item.dueDate && (
+                        <span style={{ color: '#999', fontSize: '12px' }}>Due {new Date(item.dueDate).toLocaleDateString()}</span>
+                      )}
+                    </div>
+                    <button onClick={() => handleDeleteQuickItem(item.id)} style={completeBtnStyle}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+
+            {completedQuickItems.length > 0 && (
+              <div style={completedQuickSectionStyle}>
+                <h4 style={{ margin: '0 0 8px', color: '#777', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                  Completed ({completedQuickItems.length})
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  {completedQuickItems.map((item) => (
+                    <div key={item.id} style={compactQuickItemStyle}>
+                      <div
+                        onClick={() => handleToggleQuickItem(item.id)}
+                        style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                        <span style={{ color: '#28a745', fontSize: '11px' }}>✓</span>
+                        <span style={{ textDecoration: 'line-through', color: '#999', fontSize: '12px' }}>{item.text}</span>
+                      </div>
+                      <button onClick={() => handleDeleteQuickItem(item.id)} style={compactCompleteBtnStyle}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -793,6 +822,37 @@ const completeBtnStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '12px',
+  fontWeight: 'bold',
+  flexShrink: 0,
+};
+
+const completedQuickSectionStyle = {
+  marginTop: '14px',
+  paddingTop: '10px',
+  borderTop: '1px solid #e0e6ed',
+};
+
+const compactQuickItemStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '8px',
+  backgroundColor: 'white',
+  border: '1px solid #eee',
+  borderRadius: '5px',
+  padding: '5px 10px',
+  cursor: 'pointer',
+  fontSize: '12px',
+};
+
+const compactCompleteBtnStyle = {
+  padding: '3px 8px',
+  backgroundColor: 'transparent',
+  border: '1px solid #28a745',
+  color: '#28a745',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '10px',
   fontWeight: 'bold',
   flexShrink: 0,
 };
