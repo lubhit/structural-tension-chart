@@ -49,6 +49,12 @@ const AREA_CONFIG = {
     sectionBorder: '#dccbee',
     emptyText: 'No templates yet.',
   },
+  completed: {
+    title: 'Completed',
+    ribbonColor: '#2e7d32',
+    sectionBorder: '#bfe3c4',
+    emptyText: 'No completed charts yet.',
+  },
 };
 
 const TEMPLATE_SEEDED_KEY_PREFIX = 'stc_template_seeded_';
@@ -183,9 +189,11 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   };
 
   const nonTemplateCharts = charts.filter((chart) => !chart.isTemplate);
-  const todayItems = getTodayActionItems(nonTemplateCharts, getTodayStr());
-  const workCharts = nonTemplateCharts.filter((chart) => normalizeChartType(chart) === 'work');
-  const personalCharts = nonTemplateCharts.filter((chart) => normalizeChartType(chart) === 'personal');
+  const activeCharts = nonTemplateCharts.filter((chart) => chart.status !== 'completed');
+  const todayItems = getTodayActionItems(activeCharts, getTodayStr());
+  const workCharts = activeCharts.filter((chart) => normalizeChartType(chart) === 'work');
+  const personalCharts = activeCharts.filter((chart) => normalizeChartType(chart) === 'personal');
+  const completedCharts = nonTemplateCharts.filter((chart) => chart.status === 'completed');
   const templateCharts = charts.filter((chart) => chart.isTemplate);
 
   const handleDelete = async (e, id) => {
@@ -423,6 +431,15 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
             onSaveAsTemplate={handleSaveAsTemplate}
           />
           <ChartArea
+            type="completed"
+            charts={completedCharts}
+            config={AREA_CONFIG.completed}
+            onOpenChart={onOpenChart}
+            onDelete={handleDelete}
+            onSaveAsTemplate={handleSaveAsTemplate}
+            compact
+          />
+          <ChartArea
             type="template"
             charts={templateCharts}
             config={AREA_CONFIG.template}
@@ -464,7 +481,7 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   );
 };
 
-const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete, onSaveAsTemplate, onUseTemplate }) => {
+const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete, onSaveAsTemplate, onUseTemplate, compact }) => {
   const isTemplateArea = type === 'template';
   return (
     <section style={{ ...areaSectionStyle, borderColor: config.sectionBorder }}>
@@ -474,64 +491,68 @@ const ChartArea = ({ type, charts, config, onNewChart, onOpenChart, onDelete, on
       {charts.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '20px 10px' }}>
           <p style={{ color: '#777', marginBottom: '12px' }}>{config.emptyText}</p>
-          {!isTemplateArea && (
+          {!isTemplateArea && config.newLabel && (
             <button onClick={() => onNewChart(type)} style={{ ...newBtnStyle, backgroundColor: config.ribbonColor }}>
               {config.newLabel}
             </button>
           )}
         </div>
       ) : (
-        <div style={tileGridStyle}>
+        <div style={compact ? compactTileGridStyle : tileGridStyle}>
           {charts.map((chart) => {
             const tileStatus = getTileStatus(chart);
             const bgColor = isTemplateArea ? TEMPLATE_TILE_COLOR : TILE_COLORS[tileStatus];
             const textColor = isTemplateArea ? '#fff' : (tileStatus === 'idea' || tileStatus === 'active' ? '#3a2f00' : '#fff');
+            const badgeConfig = isTemplateArea ? config : AREA_CONFIG[normalizeChartType(chart)];
+            const badgeLabel = isTemplateArea ? 'Template' : (normalizeChartType(chart) === 'work' ? 'Work' : 'Personal');
             return (
               <div
                 key={chart._id}
                 onClick={() => onOpenChart({ id: chart._id, chartType: normalizeChartType(chart) })}
-                style={{ ...tileStyle, backgroundColor: bgColor, color: textColor }}
+                style={{ ...(compact ? compactTileStyle : tileStyle), backgroundColor: bgColor, color: textColor }}
               >
                 <span
                   style={{
-                    ...typeBadgeStyle,
-                    backgroundColor: config.badgeBg,
-                    color: config.badgeText,
+                    ...(compact ? compactBadgeStyle : typeBadgeStyle),
+                    backgroundColor: badgeConfig.badgeBg,
+                    color: badgeConfig.badgeText,
                   }}
                 >
-                  {isTemplateArea ? 'Template' : (type === 'work' ? 'Work' : 'Personal')}
+                  {badgeLabel}
                 </span>
                 <button
                   onClick={(e) => onDelete(e, chart._id)}
-                  style={{ ...deleteBtnStyle, color: textColor, borderColor: textColor }}
+                  style={{ ...(compact ? compactDeleteBtnStyle : deleteBtnStyle), color: textColor, borderColor: textColor }}
                 >
                   Delete
                 </button>
-                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '10px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: compact ? '13px' : '16px', marginBottom: compact ? '4px' : '10px' }}>
                   {chart.goal ? chart.goal.slice(0, 80) : '(Untitled goal)'}
                 </div>
-                {!isTemplateArea && (
+                {!isTemplateArea && !compact && (
                   <div style={{ fontSize: '12px', opacity: 0.9 }}>
                     {chart.goalDueDate
                       ? `Due ${new Date(chart.goalDueDate).toLocaleDateString()}`
                       : 'No due date set'}
                   </div>
                 )}
-                <div style={{ fontSize: '11px', opacity: 0.75, marginTop: '6px', textTransform: 'capitalize' }}>
-                  {chart.status || 'idea'}
-                </div>
-                <div style={{ marginTop: '10px' }}>
+                {!compact && (
+                  <div style={{ fontSize: '11px', opacity: 0.75, marginTop: '6px', textTransform: 'capitalize' }}>
+                    {chart.status || 'idea'}
+                  </div>
+                )}
+                <div style={{ marginTop: compact ? '6px' : '10px' }}>
                   {isTemplateArea ? (
                     <button
                       onClick={(e) => onUseTemplate(e, chart)}
-                      style={{ ...footerBtnStyle, color: textColor, borderColor: textColor }}
+                      style={{ ...(compact ? compactFooterBtnStyle : footerBtnStyle), color: textColor, borderColor: textColor }}
                     >
                       Use Template
                     </button>
                   ) : (
                     <button
                       onClick={(e) => onSaveAsTemplate(e, chart)}
-                      style={{ ...footerBtnStyle, color: textColor, borderColor: textColor }}
+                      style={{ ...(compact ? compactFooterBtnStyle : footerBtnStyle), color: textColor, borderColor: textColor }}
                     >
                       Save as Template
                     </button>
@@ -561,6 +582,12 @@ const tileGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
   gap: '16px',
+};
+
+const compactTileGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+  gap: '10px',
 };
 
 const areaSectionStyle = {
@@ -593,6 +620,14 @@ const tileStyle = {
   boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
 };
 
+const compactTileStyle = {
+  ...tileStyle,
+  borderRadius: '8px',
+  padding: '26px 12px 10px',
+  minHeight: '60px',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+};
+
 const typeBadgeStyle = {
   position: 'absolute',
   top: '12px',
@@ -602,6 +637,14 @@ const typeBadgeStyle = {
   letterSpacing: '0.2px',
   borderRadius: '999px',
   padding: '4px 10px',
+};
+
+const compactBadgeStyle = {
+  ...typeBadgeStyle,
+  top: '8px',
+  left: '8px',
+  fontSize: '9px',
+  padding: '2px 7px',
 };
 
 const deleteBtnStyle = {
@@ -614,6 +657,14 @@ const deleteBtnStyle = {
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '11px',
+};
+
+const compactDeleteBtnStyle = {
+  ...deleteBtnStyle,
+  top: '8px',
+  right: '8px',
+  padding: '2px 7px',
+  fontSize: '9px',
 };
 
 const modalOverlayStyle = {
@@ -667,6 +718,12 @@ const footerBtnStyle = {
   cursor: 'pointer',
   fontSize: '11px',
   fontWeight: 'bold',
+};
+
+const compactFooterBtnStyle = {
+  ...footerBtnStyle,
+  padding: '3px 8px',
+  fontSize: '9px',
 };
 
 const bannerStyle = {
