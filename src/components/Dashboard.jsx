@@ -84,6 +84,19 @@ const getTodayStr = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+const getQuickItemDueStatus = (dueDate, todayStr) => {
+  if (!dueDate) return null;
+  const dueStr = dueDate.slice(0, 10);
+  if (dueStr < todayStr) return 'overdue';
+  if (dueStr === todayStr) return 'dueToday';
+  return null;
+};
+
+const QUICK_ITEM_DUE_COLORS = {
+  overdue: '#c62828',   // red
+  dueToday: '#b8860b',  // yellow/amber
+};
+
 const getTodayActionItems = (charts, todayStr) => {
   const items = [];
   for (const chart of charts) {
@@ -193,7 +206,8 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
 
   const nonTemplateCharts = charts.filter((chart) => !chart.isTemplate);
   const activeCharts = nonTemplateCharts.filter((chart) => chart.status !== 'completed');
-  const todayItems = getTodayActionItems(activeCharts, getTodayStr());
+  const todayStr = getTodayStr();
+  const todayItems = getTodayActionItems(activeCharts, todayStr);
   const workCharts = activeCharts.filter((chart) => normalizeChartType(chart) === 'work');
   const personalCharts = activeCharts.filter((chart) => normalizeChartType(chart) === 'personal');
   const completedCharts = nonTemplateCharts.filter((chart) => chart.status === 'completed');
@@ -353,23 +367,30 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
               <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No pending quick action items.</p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {pendingQuickItems.map((item) => (
-                  <div key={item.id} style={todayItemStyle}>
-                    <div
-                      onClick={() => handleToggleQuickItem(item.id)}
-                      style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}
-                    >
-                      <span style={{ color: '#ccc', fontSize: '16px' }}>○</span>
-                      <span style={{ color: '#333' }}>{item.text}</span>
-                      {item.dueDate && (
-                        <span style={{ color: '#999', fontSize: '12px' }}>Due {new Date(item.dueDate).toLocaleDateString()}</span>
-                      )}
+                {pendingQuickItems.map((item) => {
+                  const dueStatus = getQuickItemDueStatus(item.dueDate, todayStr);
+                  const dueColor = QUICK_ITEM_DUE_COLORS[dueStatus] || '#999';
+                  return (
+                    <div key={item.id} style={todayItemStyle}>
+                      <div
+                        onClick={() => handleToggleQuickItem(item.id)}
+                        style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}
+                      >
+                        <span style={{ color: '#ccc', fontSize: '16px' }}>○</span>
+                        <span style={{ color: '#333' }}>{item.text}</span>
+                        {item.dueDate && (
+                          <span style={{ color: dueColor, fontSize: '12px', fontWeight: dueStatus ? 'bold' : 'normal' }}>
+                            {dueStatus === 'overdue' ? 'Overdue ' : 'Due '}
+                            {new Date(item.dueDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={() => handleDeleteQuickItem(item.id)} style={completeBtnStyle}>
+                        Delete
+                      </button>
                     </div>
-                    <button onClick={() => handleDeleteQuickItem(item.id)} style={completeBtnStyle}>
-                      Delete
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
