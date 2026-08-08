@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { listCharts, deleteChart, getChart, updateChart, createChart } from '../api';
+import { listCharts, deleteChart, getChart, updateChart, createChart, listQuickItems, createQuickItem, updateQuickItem, deleteQuickItem } from '../api';
 import { offsetFromDates, dateFromOffset } from '../templateOffsets';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -115,25 +115,24 @@ const getTodayActionItems = (charts, todayStr) => {
   return items;
 };
 
-const QUICK_ITEMS_KEY_PREFIX = 'stc_quick_items_';
+// Legacy per-browser storage, kept only to migrate existing items to the backend once.
+const LEGACY_QUICK_ITEMS_KEY_PREFIX = 'stc_quick_items_';
 
-const loadQuickItems = (ownerId) => {
+const loadLegacyLocalQuickItems = (ownerId) => {
   try {
-    const raw = localStorage.getItem(QUICK_ITEMS_KEY_PREFIX + (ownerId || 'guest'));
+    const raw = localStorage.getItem(LEGACY_QUICK_ITEMS_KEY_PREFIX + (ownerId || 'guest'));
     return raw ? JSON.parse(raw) : [];
   } catch (err) {
-    console.error("Failed to load quick action items:", err);
+    console.error("Failed to read legacy local quick action items:", err);
     return [];
   }
 };
 
-const saveQuickItems = (ownerId, items) => {
-  try {
-    localStorage.setItem(QUICK_ITEMS_KEY_PREFIX + (ownerId || 'guest'), JSON.stringify(items));
-  } catch (err) {
-    console.error("Failed to save quick action items:", err);
-  }
+const clearLegacyLocalQuickItems = (ownerId) => {
+  localStorage.removeItem(LEGACY_QUICK_ITEMS_KEY_PREFIX + (ownerId || 'guest'));
 };
+
+const normalizeQuickItem = (item) => ({ ...item, id: item._id });
 
 const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [charts, setCharts] = useState([]);
@@ -172,33 +171,67 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
-  useEffect(() => { load(); }, [ownerId]);
-  useEffect(() => { setQuickItems(loadQuickItems(ownerId)); }, [ownerId]);
+  const loadQuick = async () => {
+    try {
+      let items = await listQuickItems(ownerId);
+      if (items.length === 0) {
+        const legacy = loadLegacyLocalQuickItems(ownerId);
+        if (legacy.length > 0) {
+          items = await Promise.all(
+            legacy.map((item) => createQuickItem({
+              text: item.text,
+              dueDate: item.dueDate || null,
+              completed: !!item.completed,
+              ownerId,
+            }))
+          );
+          clearLegacyLocalQuickItems(ownerId);
+        }
+      }
+      setQuickItems(items.map(normalizeQuickItem));
+    } catch (err) {
+      console.error("Failed to load quick action items:", err);
+    }
+  };
 
-  const handleAddQuickItem = (e) => {
+  useEffect(() => { load(); }, [ownerId]);
+  useEffect(() => { loadQuick(); }, [ownerId]);
+
+  const handleAddQuickItem = async (e) => {
     e.preventDefault();
     const text = newQuickText.trim();
     if (!text) return;
-    const item = { id: Date.now().toString(), text, dueDate: newQuickDate || null, completed: false };
-    const updated = [...quickItems, item];
-    setQuickItems(updated);
-    saveQuickItems(ownerId, updated);
-    setNewQuickText("");
-    setNewQuickDate("");
+    try {
+      const created = await createQuickItem({ text, dueDate: newQuickDate || null, completed: false, ownerId });
+      setQuickItems((prev) => [...prev, normalizeQuickItem(created)]);
+      setNewQuickText("");
+      setNewQuickDate("");
+    } catch (err) {
+      console.error("Failed to add quick action item:", err);
+      alert("Failed to add quick action item.");
+    }
   };
 
-  const handleToggleQuickItem = (id) => {
-    const updated = quickItems.map((item) =>
-      item.id === id ? { ...item, completed: !item.completed } : item
-    );
-    setQuickItems(updated);
-    saveQuickItems(ownerId, updated);
+  const handleToggleQuickItem = async (id) => {
+    const item = quickItems.find((i) => i.id === id);
+    if (!item) return;
+    try {
+      const updated = await updateQuickItem(id, { text: item.text, dueDate: item.dueDate, completed: !item.completed, ownerId });
+      setQuickItems((prev) => prev.map((i) => (i.id === id ? normalizeQuickItem(updated) : i)));
+    } catch (err) {
+      console.error("Failed to update quick action item:", err);
+      alert("Failed to update quick action item.");
+    }
   };
 
-  const handleDeleteQuickItem = (id) => {
-    const updated = quickItems.filter((item) => item.id !== id);
-    setQuickItems(updated);
-    saveQuickItems(ownerId, updated);
+  const handleDeleteQuickItem = async (id) => {
+    try {
+      await deleteQuickItem(id);
+      setQuickItems((prev) => prev.filter((i) => i.id !== id));
+    } catch (err) {
+      console.error("Failed to delete quick action item:", err);
+      alert("Failed to delete quick action item.");
+    }
   };
 
   const pendingQuickItems = quickItems.filter((item) => !item.completed);
