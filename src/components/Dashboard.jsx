@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { listCharts, deleteChart, getChart, updateChart, createChart, listQuickItems, createQuickItem, updateQuickItem, deleteQuickItem } from '../api';
 import { offsetFromDates, dateFromOffset } from '../templateOffsets';
+import QuickActionsScreen from './QuickActionsScreen';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -140,6 +141,7 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [quickItems, setQuickItems] = useState([]);
   const [newQuickText, setNewQuickText] = useState("");
   const [newQuickDate, setNewQuickDate] = useState("");
+  const [showQuickScreen, setShowQuickScreen] = useState(false);
   const [banner, setBanner] = useState("");
   const [useTemplateTarget, setUseTemplateTarget] = useState(null);
   const [useTemplateDueDate, setUseTemplateDueDate] = useState("");
@@ -197,18 +199,25 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   useEffect(() => { load(); }, [ownerId]);
   useEffect(() => { loadQuick(); }, [ownerId]);
 
+  const addQuickItem = async (text, dueDate) => {
+    try {
+      const created = await createQuickItem({ text, dueDate: dueDate || null, completed: false, ownerId });
+      setQuickItems((prev) => [...prev, normalizeQuickItem(created)]);
+      return true;
+    } catch (err) {
+      console.error("Failed to add quick action item:", err);
+      alert("Failed to add quick action item.");
+      return false;
+    }
+  };
+
   const handleAddQuickItem = async (e) => {
     e.preventDefault();
     const text = newQuickText.trim();
     if (!text) return;
-    try {
-      const created = await createQuickItem({ text, dueDate: newQuickDate || null, completed: false, ownerId });
-      setQuickItems((prev) => [...prev, normalizeQuickItem(created)]);
+    if (await addQuickItem(text, newQuickDate)) {
       setNewQuickText("");
       setNewQuickDate("");
-    } catch (err) {
-      console.error("Failed to add quick action item:", err);
-      alert("Failed to add quick action item.");
     }
   };
 
@@ -362,8 +371,20 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
+  if (showQuickScreen) {
+    return (
+      <QuickActionsScreen
+        items={quickItems}
+        onAdd={addQuickItem}
+        onToggle={handleToggleQuickItem}
+        onDelete={handleDeleteQuickItem}
+        onClose={() => setShowQuickScreen(false)}
+      />
+    );
+  }
+
   return (
-    <div style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
+    <div className="dashboard-root" style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h2 style={{ color: '#003478', margin: 0 }}>My Charts</h2>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -375,20 +396,23 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
       {banner && <div style={bannerStyle}>{banner}</div>}
 
       <div style={quickSectionStyle}>
-        <h3 style={{ margin: '0 0 12px', color: '#003478', fontSize: '15px' }}>Quick Action Items</h3>
-        <form onSubmit={handleAddQuickItem} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 12px' }}>
+          <h3 style={{ margin: 0, color: '#003478', fontSize: '15px' }}>Quick Action Items</h3>
+          <button onClick={() => setShowQuickScreen(true)} style={openFullBtnStyle}>Open ⤢</button>
+        </div>
+        <form onSubmit={handleAddQuickItem} className="qa-inline-form">
           <input
             type="text"
             value={newQuickText}
             onChange={(e) => setNewQuickText(e.target.value)}
             placeholder="Add a standalone task..."
-            style={quickInputStyle}
+            style={{ ...quickInputStyle, flex: undefined }}
           />
           <input
             type="date"
             value={newQuickDate}
             onChange={(e) => setNewQuickDate(e.target.value)}
-            style={dateInputStyle}
+            style={{ ...dateInputStyle, flexShrink: undefined }}
           />
           <button type="submit" style={newBtnStyle}>+ Add</button>
         </form>
@@ -826,6 +850,17 @@ const todaySectionStyle = {
   borderRadius: '8px',
   padding: '16px 20px',
   marginBottom: '30px',
+};
+
+const openFullBtnStyle = {
+  border: '1px solid #003478',
+  background: '#fff',
+  color: '#003478',
+  borderRadius: '14px',
+  padding: '4px 12px',
+  fontSize: '13px',
+  fontWeight: 600,
+  cursor: 'pointer',
 };
 
 const quickSectionStyle = {
