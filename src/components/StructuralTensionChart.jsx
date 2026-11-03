@@ -1,28 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getChart, createChart, updateChart } from '../api';
 import { OFFSET_OPTIONS } from '../templateOffsets';
-
-const escapeICSText = (str) =>
-  String(str).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-
-const buildStepICS = (title, description, dueDate) => {
-  const dt = dueDate.replace(/-/g, ''); // YYYY-MM-DD -> YYYYMMDD (all-day event)
-  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@structuretensionchart`;
-  return [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Structure Tension Charting App//EN',
-    'BEGIN:VEVENT',
-    `UID:${uid}`,
-    `DTSTAMP:${dtstamp}`,
-    `DTSTART;VALUE=DATE:${dt}`,
-    `SUMMARY:${escapeICSText(title)}`,
-    description ? `DESCRIPTION:${escapeICSText(description)}` : '',
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].filter(Boolean).join('\r\n');
-};
+import { addToCalendar } from '../calendar';
 
 const buildSnapshot = (vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType) =>
   JSON.stringify({ vision, goalDueDate, realityText, notes, actionSteps, completedSteps, manuallyCompleted, chartType });
@@ -227,11 +206,7 @@ const StructuralTensionChart = ({ chartId: initialChartId, chartType: initialCha
 
   const addStepToCalendar = (step) => {
     if (!step.dueDate || !step.text) return;
-    const ics = buildStepICS(step.text, `Action step for goal: ${vision}`, step.dueDate);
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    addToCalendar({ title: step.text, description: `Action step for goal: ${vision}`, dueDate: step.dueDate });
   };
 
   return (

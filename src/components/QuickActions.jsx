@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import './QuickActions.css';
+import { addToCalendar } from '../calendar';
 
 /**
  * Quick Action Items panel (embedded in the dashboard) with swipe gestures.
@@ -127,6 +128,22 @@ function SwipeRow({ item, tone, todayKey, onToggle, onDelete }) {
           <span className="qa-title">{item.text}</span>
           {key && <span className={`qa-due-label ${dueClass}`}>{formatDue(key, todayKey)}</span>}
         </span>
+        {key && !item.completed && (
+          <button
+            type="button"
+            className="qa-cal-btn"
+            aria-label="Add to Calendar"
+            title="Add to Calendar"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              addToCalendar({ title: item.text, description: 'Quick Action Item', dueDate: key });
+            }}
+          >
+            📅
+          </button>
+        )}
         <span className="qa-count">{item.completed ? '1/1' : '0/1'}</span>
       </div>
     </div>
