@@ -140,3 +140,16 @@
   .qa-card { padding: 16px; gap: 12px; }
   .qa-title { font-size: 17px; }
 }
+
+.qa-cal-btn {
+  flex: none;
+  width: 40px; height: 40px;
+  border: 1px solid rgba(0, 0, 0, .12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .7);
+  font-size: 18px; line-height: 1;
+  display: grid; place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.qa-cal-btn:active { transform: scale(.92); }
