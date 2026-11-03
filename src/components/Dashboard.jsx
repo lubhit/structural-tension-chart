@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { listCharts, deleteChart, getChart, updateChart, createChart, listQuickItems, createQuickItem, updateQuickItem, deleteQuickItem } from '../api';
 import { offsetFromDates, dateFromOffset } from '../templateOffsets';
-import QuickActionsScreen from './QuickActionsScreen';
+import QuickActions from './QuickActions';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -85,18 +85,7 @@ const getTodayStr = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
-const getQuickItemDueStatus = (dueDate, todayStr) => {
-  if (!dueDate) return null;
-  const dueStr = dueDate.slice(0, 10);
-  if (dueStr < todayStr) return 'overdue';
-  if (dueStr === todayStr) return 'dueToday';
-  return null;
-};
 
-const QUICK_ITEM_DUE_COLORS = {
-  overdue: '#c62828',   // red
-  dueToday: '#b8860b',  // yellow/amber
-};
 
 const getTodayActionItems = (charts, todayStr) => {
   const items = [];
@@ -139,9 +128,6 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
   const [charts, setCharts] = useState([]);
   const [status, setStatus] = useState("loading"); // "loading" | "" | "error"
   const [quickItems, setQuickItems] = useState([]);
-  const [newQuickText, setNewQuickText] = useState("");
-  const [newQuickDate, setNewQuickDate] = useState("");
-  const [showQuickScreen, setShowQuickScreen] = useState(false);
   const [banner, setBanner] = useState("");
   const [useTemplateTarget, setUseTemplateTarget] = useState(null);
   const [useTemplateDueDate, setUseTemplateDueDate] = useState("");
@@ -211,16 +197,6 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
-  const handleAddQuickItem = async (e) => {
-    e.preventDefault();
-    const text = newQuickText.trim();
-    if (!text) return;
-    if (await addQuickItem(text, newQuickDate)) {
-      setNewQuickText("");
-      setNewQuickDate("");
-    }
-  };
-
   const handleToggleQuickItem = async (id) => {
     const item = quickItems.find((i) => i.id === id);
     if (!item) return;
@@ -243,8 +219,6 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
-  const pendingQuickItems = quickItems.filter((item) => !item.completed);
-  const completedQuickItems = quickItems.filter((item) => item.completed);
 
   const nonTemplateCharts = charts.filter((chart) => !chart.isTemplate);
   const activeCharts = nonTemplateCharts.filter((chart) => chart.status !== 'completed');
@@ -371,18 +345,6 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
     }
   };
 
-  if (showQuickScreen) {
-    return (
-      <QuickActionsScreen
-        items={quickItems}
-        onAdd={addQuickItem}
-        onToggle={handleToggleQuickItem}
-        onDelete={handleDeleteQuickItem}
-        onClose={() => setShowQuickScreen(false)}
-      />
-    );
-  }
-
   return (
     <div className="dashboard-root" style={{ padding: '40px', maxWidth: '900px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
@@ -395,88 +357,12 @@ const Dashboard = ({ onOpenChart, onNewChart, ownerId }) => {
 
       {banner && <div style={bannerStyle}>{banner}</div>}
 
-      <div style={quickSectionStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 0 12px' }}>
-          <h3 style={{ margin: 0, color: '#003478', fontSize: '15px' }}>Quick Action Items</h3>
-          <button onClick={() => setShowQuickScreen(true)} style={openFullBtnStyle}>Open ⤢</button>
-        </div>
-        <form onSubmit={handleAddQuickItem} className="qa-inline-form">
-          <input
-            type="text"
-            value={newQuickText}
-            onChange={(e) => setNewQuickText(e.target.value)}
-            placeholder="Add a standalone task..."
-            style={{ ...quickInputStyle, flex: undefined }}
-          />
-          <input
-            type="date"
-            value={newQuickDate}
-            onChange={(e) => setNewQuickDate(e.target.value)}
-            style={{ ...dateInputStyle, flexShrink: undefined }}
-          />
-          <button type="submit" style={newBtnStyle}>+ Add</button>
-        </form>
-        {quickItems.length === 0 ? (
-          <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No quick action items yet.</p>
-        ) : (
-          <>
-            {pendingQuickItems.length === 0 ? (
-              <p style={{ color: '#999', fontSize: '13px', margin: 0 }}>No pending quick action items.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {pendingQuickItems.map((item) => {
-                  const dueStatus = getQuickItemDueStatus(item.dueDate, todayStr);
-                  const dueColor = QUICK_ITEM_DUE_COLORS[dueStatus] || '#999';
-                  return (
-                    <div key={item.id} style={todayItemStyle}>
-                      <div
-                        onClick={() => handleToggleQuickItem(item.id)}
-                        style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}
-                      >
-                        <span style={{ color: '#ccc', fontSize: '16px' }}>○</span>
-                        <span style={{ color: '#333' }}>{item.text}</span>
-                        {item.dueDate && (
-                          <span style={{ color: dueColor, fontSize: '12px', fontWeight: dueStatus ? 'bold' : 'normal' }}>
-                            {dueStatus === 'overdue' ? 'Overdue ' : 'Due '}
-                            {new Date(item.dueDate).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      <button onClick={() => handleDeleteQuickItem(item.id)} style={completeBtnStyle}>
-                        Delete
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {completedQuickItems.length > 0 && (
-              <div style={completedQuickSectionStyle}>
-                <h4 style={{ margin: '0 0 8px', color: '#777', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                  Completed ({completedQuickItems.length})
-                </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {completedQuickItems.map((item) => (
-                    <div key={item.id} style={compactQuickItemStyle}>
-                      <div
-                        onClick={() => handleToggleQuickItem(item.id)}
-                        style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}
-                      >
-                        <span style={{ color: '#28a745', fontSize: '11px' }}>✓</span>
-                        <span style={{ textDecoration: 'line-through', color: '#999', fontSize: '12px' }}>{item.text}</span>
-                      </div>
-                      <button onClick={() => handleDeleteQuickItem(item.id)} style={compactCompleteBtnStyle}>
-                        Delete
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <QuickActions
+        items={quickItems}
+        onAdd={addQuickItem}
+        onToggle={handleToggleQuickItem}
+        onDelete={handleDeleteQuickItem}
+      />
 
       {status === "" && todayItems.length > 0 && (
         <div style={todaySectionStyle}>
@@ -852,33 +738,8 @@ const todaySectionStyle = {
   marginBottom: '30px',
 };
 
-const openFullBtnStyle = {
-  border: '1px solid #003478',
-  background: '#fff',
-  color: '#003478',
-  borderRadius: '14px',
-  padding: '4px 12px',
-  fontSize: '13px',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
 
-const quickSectionStyle = {
-  backgroundColor: '#f5f7fa',
-  border: '1px solid #dbe4ee',
-  borderRadius: '8px',
-  padding: '16px 20px',
-  marginBottom: '30px',
-};
 
-const quickInputStyle = {
-  flex: 1,
-  border: '1px solid #ccc',
-  borderRadius: '4px',
-  padding: '8px 10px',
-  fontSize: '13px',
-  fontFamily: 'inherit',
-};
 
 const dateInputStyle = {
   border: '1px solid #ccc',
@@ -915,36 +776,8 @@ const completeBtnStyle = {
   flexShrink: 0,
 };
 
-const completedQuickSectionStyle = {
-  marginTop: '14px',
-  paddingTop: '10px',
-  borderTop: '1px solid #e0e6ed',
-};
 
-const compactQuickItemStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: '8px',
-  backgroundColor: 'white',
-  border: '1px solid #eee',
-  borderRadius: '5px',
-  padding: '5px 10px',
-  cursor: 'pointer',
-  fontSize: '12px',
-};
 
-const compactCompleteBtnStyle = {
-  padding: '3px 8px',
-  backgroundColor: 'transparent',
-  border: '1px solid #28a745',
-  color: '#28a745',
-  borderRadius: '4px',
-  cursor: 'pointer',
-  fontSize: '10px',
-  fontWeight: 'bold',
-  flexShrink: 0,
-};
 
 const emptyStateStyle = {
   textAlign: 'center',
