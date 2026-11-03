@@ -1,27 +1,27 @@
-.qa-screen {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
+.qa-panel {
   background: #fffdfb;
+  border: 1px solid #f1e4e6;
+  border-radius: 16px;
+  padding: 16px 16px 8px;
+  margin-bottom: 30px;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   color: #1c1c1e;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  overscroll-behavior: contain;
 }
 
 .qa-header {
-  display: grid;
-  grid-template-columns: 44px 1fr 44px;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  padding: 12px 16px 4px;
+  gap: 12px;
+  margin-bottom: 4px;
 }
-.qa-header h1 { margin: 0; text-align: center; font-size: 22px; font-weight: 700; color: #1c1c1e; }
-.qa-back {
-  border: none; background: #f1f2f4; border-radius: 50%;
-  width: 36px; height: 36px; font-size: 24px; line-height: 1; color: #003478;
+.qa-header h3 { margin: 0; color: #003478; font-size: 17px; }
+.qa-header-day { color: #8e8e93; font-weight: 500; }
+.qa-add-btn {
+  flex: none;
+  border: none; border-radius: 18px;
+  background: #e8606d; color: #fff;
+  padding: 8px 16px; font-size: 15px; font-weight: 600;
   cursor: pointer;
 }
 
@@ -29,22 +29,19 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
-  padding: 12px 12px 4px;
-  max-width: 640px;
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
+  padding: 12px 0 4px;
 }
 .qa-day {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   border: none; background: none; padding: 6px 0; border-radius: 24px; color: #8e8e93;
-  cursor: pointer;
+  cursor: pointer; min-width: 0;
 }
 .qa-dow { font-size: 14px; }
 .qa-dnum {
   width: 40px; height: 40px; border-radius: 50%;
   display: grid; place-items: center;
   border: 3px solid #f6d6dc; font-size: 15px;
+  box-sizing: border-box;
 }
 .qa-dnum-today { color: #1c1c1e; font-weight: 600; }
 .qa-dot { height: 10px; line-height: 10px; font-size: 14px; color: #e8606d; letter-spacing: 1px; }
@@ -52,9 +49,8 @@
 .qa-day-on .qa-dnum { border-color: #e8707c; font-weight: 600; }
 
 .qa-chips {
-  display: flex; gap: 8px; overflow-x: auto; padding: 8px 16px 12px;
+  display: flex; gap: 8px; overflow-x: auto; padding: 8px 0 12px;
   scrollbar-width: none;
-  max-width: 640px; width: 100%; margin: 0 auto; box-sizing: border-box;
 }
 .qa-chips::-webkit-scrollbar { display: none; }
 .qa-chip {
@@ -63,15 +59,9 @@
 }
 .qa-chip-on { background: #e8606d; color: #fff; }
 
-.qa-list {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 16px 120px;
-  max-width: 640px; width: 100%; margin: 0 auto; box-sizing: border-box;
-}
+.qa-list { padding: 4px 0 0; }
 .qa-section { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #8e8e93; margin: 20px 4px 8px; }
-.qa-empty, .qa-hint { text-align: center; color: #aeaeb2; font-size: 14px; margin-top: 24px; }
+.qa-empty, .qa-hint { text-align: center; color: #aeaeb2; font-size: 14px; margin: 16px 0 8px; }
 
 .qa-row {
   position: relative;
@@ -111,6 +101,7 @@
   flex: none; width: 26px; height: 26px; border-radius: 50%;
   border: 2px solid #c7c7cc; display: grid; place-items: center;
   color: #fff; font-size: 15px; font-weight: 700;
+  box-sizing: border-box;
 }
 .qa-check-on { background: #6cbf4f; border-color: #6cbf4f; }
 .qa-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -120,16 +111,6 @@
 .qa-due-today { color: #b8860b; font-weight: 600; }
 .qa-count { flex: none; font-size: 17px; color: #3a3a3c; }
 .qa-done .qa-title { text-decoration: line-through; color: #8e8e93; }
-
-.qa-fab {
-  position: fixed;
-  right: 24px;
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  width: 60px; height: 60px; border-radius: 50%;
-  border: none; background: #e8606d; color: #fff;
-  font-size: 32px; line-height: 1; cursor: pointer;
-  box-shadow: 0 6px 18px rgba(232, 96, 109, .4);
-}
 
 .qa-sheet-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,.3);
@@ -151,18 +132,11 @@
   background: #003478; color: #fff; font-size: 17px; font-weight: 600; cursor: pointer;
 }
 
-/* Fix for the inline Quick Action Items form on narrow screens */
-.qa-inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.qa-inline-form > input[type="text"] { flex: 1 1 100%; min-width: 0; }
-.qa-inline-form > input[type="date"] { flex: 1 1 auto; min-height: 36px; -webkit-appearance: none; appearance: none; background: #fff; }
-.qa-inline-form > button { flex: 0 0 auto; }
-@media (min-width: 640px) {
-  .qa-inline-form { flex-wrap: nowrap; }
-  .qa-inline-form > input[type="text"] { flex: 1 1 auto; }
-  .qa-inline-form > input[type="date"] { flex: 0 0 auto; }
-}
-
-/* Tighter dashboard padding on phones so cards don't overflow */
+/* Phones: tighter dashboard padding, smaller day circles so 7 fit */
 @media (max-width: 640px) {
   .dashboard-root { padding: 16px !important; }
+  .qa-panel { padding: 14px 12px 6px; }
+  .qa-dnum { width: 36px; height: 36px; font-size: 14px; }
+  .qa-card { padding: 16px; gap: 12px; }
+  .qa-title { font-size: 17px; }
 }

@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
-import './QuickActionsScreen.css';
+import './QuickActions.css';
 
 /**
- * Full-screen Quick Action Items view with swipe gestures.
+ * Quick Action Items panel (embedded in the dashboard) with swipe gestures.
  *   Swipe right -> toggle complete
  *   Swipe left  -> delete
  *   Tap         -> toggle complete
@@ -12,7 +12,6 @@ import './QuickActionsScreen.css';
  *   onAdd(text, dueDate|null)
  *   onToggle(id)
  *   onDelete(id)
- *   onClose()
  */
 
 const SWIPE_TRIGGER = 90;
@@ -142,7 +141,7 @@ const FILTERS = [
   { id: 'nodate', label: 'No date' },
 ];
 
-export default function QuickActionsScreen({ items = [], onAdd, onToggle, onDelete, onClose }) {
+export default function QuickActions({ items = [], onAdd, onToggle, onDelete }) {
   const days = useMemo(nextSevenDays, []);
   const todayKey = ymd(new Date());
   const [day, setDay] = useState(null); // null = no day selected
@@ -200,18 +199,20 @@ export default function QuickActionsScreen({ items = [], onAdd, onToggle, onDele
     setAdding(false);
   };
 
-  const heading = day
+  const dayLabel = day
     ? day === todayKey
       ? 'Today'
-      : new Date(day + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
-    : 'Action Items';
+      : new Date(day + 'T00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    : null;
 
   return (
-    <div className="qa-screen">
+    <section className="qa-panel">
       <header className="qa-header">
-        <button className="qa-back" onClick={onClose} aria-label="Back">‹</button>
-        <h1>{heading}</h1>
-        <span />
+        <h3>
+          Quick Action Items
+          {dayLabel && <span className="qa-header-day"> · {dayLabel}</span>}
+        </h3>
+        <button className="qa-add-btn" onClick={openAdd} aria-label="Add action item">+ Add</button>
       </header>
 
       <div className="qa-week">
@@ -239,7 +240,7 @@ export default function QuickActionsScreen({ items = [], onAdd, onToggle, onDele
         ))}
       </div>
 
-      <main className="qa-list">
+      <div className="qa-list">
         {open.length === 0 && done.length === 0 && <p className="qa-empty">Nothing here. Tap + to add.</p>}
         {open.map((it, i) => (
           <SwipeRow
@@ -256,7 +257,7 @@ export default function QuickActionsScreen({ items = [], onAdd, onToggle, onDele
           <SwipeRow key={it.id} item={it} tone="#f2f3f5" todayKey={todayKey} onToggle={onToggle} onDelete={onDelete} />
         ))}
         {visible.length > 0 && <p className="qa-hint">Swipe right to complete · left to delete</p>}
-      </main>
+      </div>
 
       {adding && (
         <div className="qa-sheet-backdrop" onClick={() => setAdding(false)}>
@@ -270,8 +271,6 @@ export default function QuickActionsScreen({ items = [], onAdd, onToggle, onDele
           </form>
         </div>
       )}
-
-      <button className="qa-fab" onClick={openAdd} aria-label="Add action item">+</button>
-    </div>
+    </section>
   );
 }
